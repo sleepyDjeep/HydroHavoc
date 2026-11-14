@@ -1,0 +1,268 @@
+[gd_scene load_steps=2 format=3 uid="uid://hudscene01"]
+
+[ext_resource type="Script" path="res://scripts/ui/game_hud.gd" id="1_hud"]
+
+[node name="GameHUD" type="CanvasLayer"]
+script = ExtResource("1_hud")
+
+[node name="RootControl" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TopBar" type="HBoxContainer" parent="RootControl"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 24.0
+offset_top = 16.0
+offset_right = -24.0
+offset_bottom = 86.0
+grow_horizontal = 2
+theme_override_constants/separation = 32
+
+[node name="TitleBox" type="VBoxContainer" parent="RootControl/TopBar"]
+layout_mode = 2
+alignment = 1
+
+[node name="Title" type="Label" parent="RootControl/TopBar/TitleBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 28
+text = "HYDRO HAVOC"
+
+[node name="Subtitle" type="Label" parent="RootControl/TopBar/TitleBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.75, 0.85, 0.8)
+theme_override_font_sizes/font_size = 13
+text = "LIVE STREAM ARENA"
+
+[node name="ScoreBox" type="VBoxContainer" parent="RootControl/TopBar"]
+layout_mode = 2
+alignment = 1
+
+[node name="ScoreVal" type="Label" parent="RootControl/TopBar/ScoreBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.3, 1)
+theme_override_font_sizes/font_size = 26
+text = "0"
+
+[node name="MultiplierVal" type="Label" parent="RootControl/TopBar/ScoreBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.5, 0.2, 1)
+theme_override_font_sizes/font_size = 13
+text = "x1.0 COMBO"
+
+[node name="StatsBox" type="VBoxContainer" parent="RootControl/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+
+[node name="WaterVolLabel" type="Label" parent="RootControl/TopBar/StatsBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "0L Contained"
+
+[node name="WaterVolBar" type="ProgressBar" parent="RootControl/TopBar/StatsBox"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+value = 25.0
+show_percentage = false
+
+[node name="DrainBox" type="VBoxContainer" parent="RootControl/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+
+[node name="DrainLabel" type="Label" parent="RootControl/TopBar/DrainBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 13
+text = "0% Spilled"
+
+[node name="DrainBar" type="ProgressBar" parent="RootControl/TopBar/DrainBox"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+value = 10.0
+show_percentage = false
+
+[node name="VipBanner" type="PanelContainer" parent="RootControl"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -280.0
+offset_top = 96.0
+offset_right = -24.0
+offset_bottom = 136.0
+grow_horizontal = 0
+
+[node name="VipLabel" type="Label" parent="RootControl/VipBanner"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+theme_override_font_sizes/font_size = 14
+text = "👑 MVP Gifter: Waiting for First Bit..."
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RightPanel" type="VBoxContainer" parent="RootControl"]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -120.0
+offset_top = -140.0
+offset_right = -20.0
+offset_bottom = 220.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="QueueTitle" type="Label" parent="RootControl/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "NEXT PIECES"
+horizontal_alignment = 1
+
+[node name="QueueContainer" type="HBoxContainer" parent="RootControl/RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="BottomBar" type="HBoxContainer" parent="RootControl"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -300.0
+offset_top = -64.0
+offset_right = 300.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="BtnAbility1" type="Button" parent="RootControl/BottomBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "[1] Flash Freeze"
+
+[node name="BtnAbility2" type="Button" parent="RootControl/BottomBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "[2] Solar Ray"
+
+[node name="BtnAbility3" type="Button" parent="RootControl/BottomBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "[3] Seismic Anchor"
+
+[node name="StreamDock" type="VBoxContainer" parent="RootControl"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -240.0
+offset_right = 260.0
+offset_bottom = -20.0
+grow_vertical = 0
+theme_override_constants/separation = 6
+
+[node name="DockTitle" type="Label" parent="RootControl/StreamDock"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.3, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "STREAM TEST CONTROLS"
+
+[node name="GridBtns" type="GridContainer" parent="RootControl/StreamDock"]
+layout_mode = 2
+columns = 2
+
+[node name="BtnBits100" type="Button" parent="RootControl/StreamDock/GridBtns"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "+100 Bits"
+
+[node name="BtnBits500" type="Button" parent="RootControl/StreamDock/GridBtns"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "+500 Bits"
+
+[node name="BtnBits1000" type="Button" parent="RootControl/StreamDock/GridBtns"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "+1000 Bits"
+
+[node name="BtnTikTokRose" type="Button" parent="RootControl/StreamDock/GridBtns"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "TikTok Rose"
+
+[node name="BtnTikTokGalaxy" type="Button" parent="RootControl/StreamDock/GridBtns"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "TikTok Galaxy"
+
+[node name="BtnTikTokLion" type="Button" parent="RootControl/StreamDock/GridBtns"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "TikTok Lion"
+
+[node name="BtnAspectToggle" type="Button" parent="RootControl/StreamDock"]
+layout_mode = 2
+text = "Toggle 16:9 / 9:16 (T)"
+
+[node name="ToastPanel" type="PanelContainer" parent="RootControl"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -260.0
+offset_top = -180.0
+offset_right = 260.0
+offset_bottom = -90.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(260, 45)
+
+[node name="VBox" type="VBoxContainer" parent="RootControl/ToastPanel"]
+layout_mode = 2
+alignment = 1
+
+[node name="ToastTitle" type="Label" parent="RootControl/ToastPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 20
+text = "STREAM ALERT"
+horizontal_alignment = 1
+
+[node name="ToastSubtitle" type="Label" parent="RootControl/ToastPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 0.9)
+theme_override_font_sizes/font_size = 14
+text = "Event details here..."
+horizontal_alignment = 1
+
+[connection signal="pressed" from="RootControl/BottomBar/BtnAbility1" to="." method="emit_signal" binds= ["ability_triggered", 1]]
+[connection signal="pressed" from="RootControl/BottomBar/BtnAbility2" to="." method="emit_signal" binds= ["ability_triggered", 2]]
+[connection signal="pressed" from="RootControl/BottomBar/BtnAbility3" to="." method="emit_signal" binds= ["ability_triggered", 3]]
+[connection signal="pressed" from="RootControl/StreamDock/GridBtns/BtnBits100" to="." method="emit_signal" binds= ["simulate_event_clicked", "bits_100"]]
+[connection signal="pressed" from="RootControl/StreamDock/GridBtns/BtnBits500" to="." method="emit_signal" binds= ["simulate_event_clicked", "bits_500"]]
+[connection signal="pressed" from="RootControl/StreamDock/GridBtns/BtnBits1000" to="." method="emit_signal" binds= ["simulate_event_clicked", "bits_1000"]]
+[connection signal="pressed" from="RootControl/StreamDock/GridBtns/BtnTikTokRose" to="." method="emit_signal" binds= ["simulate_event_clicked", "tiktok_rose"]]
+[connection signal="pressed" from="RootControl/StreamDock/GridBtns/BtnTikTokGalaxy" to="." method="emit_signal" binds= ["simulate_event_clicked", "tiktok_galaxy"]]
+[connection signal="pressed" from="RootControl/StreamDock/GridBtns/BtnTikTokLion" to="." method="emit_signal" binds= ["simulate_event_clicked", "tiktok_lion"]]
+[connection signal="pressed" from="RootControl/StreamDock/BtnAspectToggle" to="." method="toggle_orientation"]

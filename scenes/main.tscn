@@ -1,0 +1,51 @@
+[gd_scene load_steps=7 format=3 uid="uid://mainscene01"]
+
+[ext_resource type="Script" path="res://scripts/core/game_manager.gd" id="1_gm"]
+[ext_resource type="Script" path="res://scripts/core/stream_event_manager.gd" id="2_stream"]
+[ext_resource type="PackedScene" uid="uid://hudscene01" path="res://scenes/ui/hud.tscn" id="3_hud"]
+[ext_resource type="Script" path="res://scripts/props/prop_manager.gd" id="4_props"]
+
+[sub_resource type="Environment" id="Environment_main"]
+background_mode = 1
+background_color = Color(0.05, 0.08, 0.14, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.4, 0.48, 0.6, 1)
+ambient_light_energy = 0.8
+tonemap_mode = 3
+glow_enabled = true
+glow_bloom = 0.15
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_gm")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_main")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 10, 20, 10)
+light_color = Color(1, 0.96, 0.9, 1)
+light_energy = 1.2
+shadow_enabled = true
+
+[node name="CameraPivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.766044, 0.642788, 0, -0.642788, 0.766044, 0, 14, 14)
+
+[node name="Camera3D" type="Camera3D" parent="CameraPivot"]
+current = true
+fov = 52.0
+
+[node name="Arena" type="Node3D" parent="."]
+
+[node name="TerrainMeshInstance" type="MeshInstance3D" parent="Arena"]
+
+[node name="WaterMeshInstance" type="MeshInstance3D" parent="Arena"]
+
+[node name="CursorRoot" type="Node3D" parent="Arena"]
+
+[node name="PropManager" type="Node3D" parent="Arena"]
+script = ExtResource("4_props")
+
+[node name="StreamEventManager" type="Node" parent="."]
+script = ExtResource("2_stream")
+
+[node name="GameHUD" parent="." instance=ExtResource("3_hud")]
