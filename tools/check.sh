@@ -73,3 +73,11 @@ if ! "$GODOT" --headless --path "$ROOT" --script "res://tests/sim_invariants.gd"
 fi
 
 echo "OK: simulation invariants hold."
+
+echo "== donor name policy =="
+if ! "$GODOT" --headless --path "$ROOT" --script "res://tests/name_policy_test.gd"; then
+	echo "FAIL: donor name policy broke." >&2
+	exit 1
+fi
+
+echo "OK: donor name policy holds."

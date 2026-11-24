@@ -6,7 +6,7 @@ All notable changes to this project are recorded here. Dates are commit dates; t
 
 ### Added
 
-- `tests/sim_invariants.gd`: a seeded, scripted harness that drives piece drops, gifts and abilities through the real scene and asserts water mass conservation, finite field values, prop bookkeeping (no dead/plunged/untracked props) and the sim step cap. Wired into `tools/check.sh`, so CI runs it.
+  - Donor-name display policy (`scripts/core/name_policy.gd`): control/zero-width/bidi characters stripped, whitespace collapsed, 16-character clamp, and a blocklist at `user://name_blocklist.txt` that folds case, punctuation, spacing, leet substitutions and repeated letters before matching. Blocked or empty names render as `Viewer`. Applied to prop nameplates, prop boil/plunge alerts, gift alerts and the VIP throne.
 - Cumulative `total_added_water`, `total_evaporated_water` and `total_drained_water` counters so the conservation identity can be audited. `total_drained_water` is separate from the earthquake-resettable drain meter.
 
 ### Changed

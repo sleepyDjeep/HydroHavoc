@@ -44,6 +44,17 @@ A 2.5D water-puzzle game in the spirit of *Wetrix*, built in Godot 4.7 with a st
 | Ability 3 — Seismic Anchor (12 s) | `3` |
 | Inject a test donation | `Tab` (debug shortcut, see the mock dock in the HUD) |
 
+## Donor names on screen
+
+Viewer-supplied names reach prop nameplates, gift alerts and the VIP throne, so they pass through `scripts/core/name_policy.gd` first:
+
+- Names are stripped of control characters, zero-width and bidi-override characters, and collapsed whitespace, then clamped to 16 characters (`...` when trimmed). A name cannot reflow a plate, add a second line, or visually reorder itself.
+- A blocklist is matched after folding case, punctuation, spacing, leet substitutions (`0 1 3 4 5 7 8 @ $`) and repeated letters, so `n i g g 3 r` is caught like any other spelling.
+- Anything that matches is replaced with `Viewer` rather than masked, and the name itself is not written to the log.
+
+The blocklist lives in `user://name_blocklist.txt` (`%APPDATA%Godotpp_userdataHydroHavoc
+ame_blocklist.txt` on Windows). It is created with a default list on first run and is plain text, one entry per line: `*term*` matches anywhere in a name, a bare `term` matches only the whole name. Substring entries can catch innocent words, so switch an entry to a bare word if that matters. Edit the file and restart, or delete it to restore the defaults.
+
 ## Running it
 
 1. Install Godot 4.7.x with the Forward+ renderer (the project was last booted on 4.7.2).

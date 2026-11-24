@@ -70,7 +70,9 @@ func setup(p_sim: FluidSim, p_class: PropClass, p_donor: String, p_tier: String,
 	var class_changed: bool = p_class != prop_class
 	fluid_sim = p_sim
 	prop_class = p_class
-	donor_name = p_donor
+	# Stored as the display string, not the raw event payload: this name goes straight
+	# onto a nameplate and into the boil/plunge alerts, both of which are on frame.
+	donor_name = NamePolicy.display_name(p_donor)
 	gift_tier = p_tier
 	gift_value = p_val
 

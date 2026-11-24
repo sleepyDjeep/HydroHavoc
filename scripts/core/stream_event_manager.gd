@@ -26,6 +26,9 @@ func _ready() -> void:
 	pass
 
 func simulate_twitch_event(donor_name: String, bits: int) -> void:
+	# Applied at the ingress point so alerts and the VIP throne get the same treatment
+	# as the nameplates, and so a future bridge inherits it without changes.
+	donor_name = NamePolicy.display_name(donor_name)
 	_record_donor(donor_name, bits)
 	if bits < 50:
 		emit_signal("stream_action_received", donor_name, "DUCK_SPLASH", bits, "Twitch")
@@ -44,6 +47,7 @@ func simulate_twitch_event(donor_name: String, bits: int) -> void:
 		emit_signal("alert_announcement", "APOCALYPSE BOMB!", donor_name + " summoned a Meteor!", Color(1.0, 0.1, 0.3))
 
 func simulate_tiktok_gift(donor_name: String, gift_name: String, coin_value: int) -> void:
+	donor_name = NamePolicy.display_name(donor_name)
 	_record_donor(donor_name, coin_value)
 	match gift_name.to_lower():
 		"rose":
