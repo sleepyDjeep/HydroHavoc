@@ -26,7 +26,7 @@ A 2.5D water-puzzle game in the spirit of *Wetrix*, built in Godot 4.7 with a st
 - **No run loop.** There are no waves, rounds, timers, budget, or game over. The economy described in the product plan (rising water per wave, enclose → clear → score) does not exist.
 - **No real platform integration.** No Twitch EventSub, TikTok Live, Kick or YouTube connection. `StreamEventManager` only holds mock helpers; a bridge process is planned but not started.
 - **No menu, pause, settings, audio, or save.** One hand-built starting map.
-- **Web export is untested.** The presets exist (`export_presets.cfg`), but the exported build in `docs/` has not been verified in a browser by this project.
+- **No public build.** The Windows and Web presets exist (`export_presets.cfg`), but nothing is published and the Web export has never been verified in a browser by this project. The old GitHub Pages demo was a pre-Phase-0 export and has been withdrawn until the run loop exists.
 - **Placeholder art throughout.** Procedural meshes and shaders; the gift crate has no texture; splash rings are opaque white torus meshes and the steam puff is an oversized sphere.
 - **Known visual defects.** Water edges and foam read badly at the default camera; the gift crate GLB ships without a texture and renders as a blank box; the anchor sinks to the bed, so in water deeper than about 1.8 m only its crown shows.
 - **Performance is unmeasured.** No frame-time or CPU budget has been recorded for either target.
@@ -52,8 +52,7 @@ Viewer-supplied names reach prop nameplates, gift alerts and the VIP throne, so 
 - A blocklist is matched after folding case, punctuation, spacing, leet substitutions (`0 1 3 4 5 7 8 @ $`) and repeated letters, so `n i g g 3 r` is caught like any other spelling.
 - Anything that matches is replaced with `Viewer` rather than masked, and the name itself is not written to the log.
 
-The blocklist lives in `user://name_blocklist.txt` (`%APPDATA%Godotpp_userdataHydroHavoc
-ame_blocklist.txt` on Windows). It is created with a default list on first run and is plain text, one entry per line: `*term*` matches anywhere in a name, a bare `term` matches only the whole name. Substring entries can catch innocent words, so switch an entry to a bare word if that matters. Edit the file and restart, or delete it to restore the defaults.
+The blocklist lives in `user://name_blocklist.txt` (`%APPDATA%\Godot\app_userdata\HydroHavoc\name_blocklist.txt` on Windows). It is created with a default list on first run and is plain text, one entry per line: `*term*` matches anywhere in a name, a bare `term` matches only the whole name. Substring entries can catch innocent words, so switch an entry to a bare word if that matters. Edit the file and restart, or delete it to restore the defaults.
 
 ## Running it
 
@@ -82,14 +81,14 @@ scripts/core/fluid_sim.gd     Heightfield water: flux advection, spill accountin
 scripts/core/game_manager.gd  Input, placement, scoring, abilities, hazards, quake
 scripts/core/piece_manager.gd Piece templates, weighted queue, rotation
 scripts/core/stream_event_manager.gd  Mock audience event hub (no network)
+scripts/core/name_policy.gd   Donor-name clamp and blocklist for on-screen names
 scripts/core/terrain_mesh_builder.gd  Terrain surface mesh
 scripts/core/water_mesh_builder.gd    Water surface mesh
 scripts/props/prop_manager.gd Spawning, splash waves, steam vaporisation
 scripts/props/floating_prop.gd Buoyancy, drift, tilt, nameplate
 scripts/ui/game_hud.gd        Meter/queue/cooldown updates, alerts
 assets/shaders/               Terrain and water shaders
-docs/                         GitHub Pages copy of the web export
-tools/check.sh                Import + parse check used locally and in CI
+tools/check.sh                Import, parse and test gate used locally and in CI
 ```
 
 ## Verification status
@@ -103,6 +102,6 @@ Not verified: performance, the web export, the 9:16 layout on a portrait canvas,
 
 ## Repo notes
 
-- Build output is not tracked. `export_presets.cfg` exports to `build/`, which is gitignored; `docs/` keeps one exported web build because GitHub Pages serves it.
+- No export is committed. `export_presets.cfg` writes to `build/`, which is gitignored; publishing a demo again means exporting and committing the result deliberately.
 - CI (`.github/workflows/ci.yml`) pins Godot 4.7.2 and runs `tools/check.sh`. Bump `GODOT_VERSION` in the workflow when the engine is upgraded. The workflow has not been run yet.
 - Licence: MIT, see [LICENSE](LICENSE). Changes are listed in [CHANGELOG.md](CHANGELOG.md).

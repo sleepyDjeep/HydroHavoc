@@ -5,11 +5,8 @@
 .DS_Store
 Thumbs.db
 
-# Export output (regenerated locally; GitHub Pages serves the docs/ copy instead)
+# Export output (regenerated locally; nothing is published from the repo)
 build/
-
-# Godot import sidecars for exported builds, regenerated on every local import
-docs/*.import
 
 # Local verification artifacts
 .verify/
