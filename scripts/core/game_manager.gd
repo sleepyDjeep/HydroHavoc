@@ -6,6 +6,7 @@ extends Node3D
 
 const SPILL_THRESHOLD: float = 35.0 # Liters before earthquake triggers
 const TICK_RATE: float = 1.0 / 30.0 # 30Hz fluid sim step
+const MAX_SIM_STEPS_PER_FRAME: int = 4 # catch-up cap: one long frame must not spiral
 const WATER_CAPACITY: float = 1228.8 # 32x32 cells at 1.2 depth: the arena completely awash
 const ABILITY_COOLDOWNS: Array[float] = [10.0, 4.0, 12.0]
 
@@ -42,6 +43,7 @@ var is_frozen: bool = false
 var freeze_timer: float = 0.0
 var ability_cooldowns: Array[float] = [0.0, 0.0, 0.0]
 var water_mesh_revision: int = -1
+var sim_steps_last_frame: int = 0
 
 func _ready() -> void:
 	_init_simulation()
@@ -121,12 +123,20 @@ func _process(delta: float) -> void:
 	_handle_freeze(delta)
 	_handle_ability_cooldowns(delta)
 
-	# Fluid simulation stepped at fixed tick rate
+	# Fluid simulation stepped at fixed tick rate, with a per-frame catch-up cap. Without
+	# it a single long frame (a stream hitch, a shader compile) asks for a dozen steps,
+	# which makes the next frame longer still and the sim never catches up.
+	sim_steps_last_frame = 0
 	if not is_frozen:
 		sim_accum += delta
-		while sim_accum >= TICK_RATE:
+		while sim_accum >= TICK_RATE and sim_steps_last_frame < MAX_SIM_STEPS_PER_FRAME:
 			sim.step(TICK_RATE)
 			sim_accum -= TICK_RATE
+			sim_steps_last_frame += 1
+		# Drop whole ticks we could not afford this frame: keep at most one tick of
+		# remainder so the sim runs slightly slow after a hitch instead of banking debt.
+		if sim_accum > TICK_RATE:
+			sim_accum = TICK_RATE
 
 	# Rebuilds only when the simulation revision moved (see rebuild_water)
 	rebuild_water()

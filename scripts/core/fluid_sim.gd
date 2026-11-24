@@ -27,6 +27,16 @@ var total_spilled_water: float = 0.0
 var spill_rate: float = 0.0
 var active_water_volume: float = 0.0
 
+# Cumulative bookkeeping. Water only enters through add_water() and only leaves through
+# evaporate_at() or the rim, so
+#   total_added - total_evaporated - total_drained == active_water_volume
+# must hold. tests/sim_invariants.gd asserts exactly that. total_drained is deliberately
+# separate from total_spilled_water: the latter is the drain meter the earthquake resets,
+# so using it here would erase the spill from the ledger every 35 L.
+var total_added_water: float = 0.0
+var total_evaporated_water: float = 0.0
+var total_drained_water: float = 0.0
+
 # Monotonic counter bumped whenever terrain or water changes. Consumers that derive
 # geometry from the field (the water mesh) use it to skip redundant rebuilds.
 var water_revision: int = 0
@@ -44,6 +54,9 @@ func reset() -> void:
 	total_spilled_water = 0.0
 	spill_rate = 0.0
 	active_water_volume = 0.0
+	total_added_water = 0.0
+	total_evaporated_water = 0.0
+	total_drained_water = 0.0
 	water_revision += 1
 	for i in range(CELL_COUNT):
 		terrain[i] = 0.0
@@ -83,7 +96,9 @@ func get_water(x: int, y: int) -> float:
 func add_water(x: int, y: int, volume: float) -> void:
 	if is_in_bounds(x, y):
 		var idx: int = get_index(x, y)
-		water[idx] = maxf(0.0, water[idx] + volume)
+		var before: float = water[idx]
+		water[idx] = maxf(0.0, before + volume)
+		total_added_water += water[idx] - before
 		water_revision += 1
 
 func evaporate_at(center_x: int, center_y: int, radius: int, max_evap: float) -> float:
@@ -102,6 +117,7 @@ func evaporate_at(center_x: int, center_y: int, radius: int, max_evap: float) ->
 						water[idx] -= removed
 						total_evaporated += removed
 	if total_evaporated > 0.0:
+		total_evaporated_water += total_evaporated
 		water_revision += 1
 	return total_evaporated
 
@@ -244,6 +260,7 @@ func step(dt: float) -> void:
 			field_motion += absf(sum_in - sum_out)
 
 	total_spilled_water += current_step_spill
+	total_drained_water += current_step_spill
 	spill_rate = current_step_spill / dt
 	active_water_volume = current_active_vol
 

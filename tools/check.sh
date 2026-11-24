@@ -52,7 +52,7 @@ while IFS= read -r file; do
 		"$GODOT" --headless --path "$ROOT" --check-only --script "res://$rel" 2>&1 | sed 's/^/    /'
 		failed=$((failed + 1))
 	fi
-done < <(find "$ROOT/scripts" -name '*.gd' | sort)
+done < <(find "$ROOT/scripts" "$ROOT/tests" -name '*.gd' | sort)
 
 if [ "$total" -eq 0 ]; then
 	echo "FAIL: no scripts found under $ROOT/scripts." >&2
@@ -65,3 +65,11 @@ if [ "$failed" -ne 0 ]; then
 fi
 
 echo "OK: $total scripts parsed."
+
+echo "== sim invariants =="
+if ! "$GODOT" --headless --path "$ROOT" --script "res://tests/sim_invariants.gd"; then
+	echo "FAIL: simulation invariants broke." >&2
+	exit 1
+fi
+
+echo "OK: simulation invariants hold."

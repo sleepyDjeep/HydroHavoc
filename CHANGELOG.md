@@ -4,8 +4,14 @@ All notable changes to this project are recorded here. Dates are commit dates; t
 
 ## [Unreleased]
 
+### Added
+
+- `tests/sim_invariants.gd`: a seeded, scripted harness that drives piece drops, gifts and abilities through the real scene and asserts water mass conservation, finite field values, prop bookkeeping (no dead/plunged/untracked props) and the sim step cap. Wired into `tools/check.sh`, so CI runs it.
+- Cumulative `total_added_water`, `total_evaporated_water` and `total_drained_water` counters so the conservation identity can be audited. `total_drained_water` is separate from the earthquake-resettable drain meter.
+
 ### Changed
 
+- The fluid sim steps at most 4 fixed ticks per frame and drops any further backlog, so a single long frame can no longer put the sim into permanent catch-up.
 - Prop visuals are normalised to per-class target heights (1.35 m crate, 1.7 m duck, 2.2 m mascot, 2.6 m anchor) instead of whatever their source mesh happened to be, so every class is identifiable at 720p from the default camera. The anchor gained a ring at its shank head so its silhouette reads as an anchor rather than a "T". Buoyancy, advection and bed-clamping offsets are unchanged.
 - Donor nameplates scaled up to roughly 0.46 m per line (~23 px at 720p) with a heavier outline and no depth test.
 

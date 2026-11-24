@@ -56,7 +56,7 @@ godot --path .
 
 ### Checking the scripts
 
-`tools/check.sh` imports the project and parses every script in `scripts/` with a real Godot binary, so a syntax or type error fails loudly instead of surfacing at runtime:
+`tools/check.sh` imports the project, parses every script with a real Godot binary, then runs `tests/sim_invariants.gd` — a seeded, scripted run that asserts water mass conservation, no non-finite field values, no leaked or orphaned props, and that the fixed-step sim's catch-up cap holds under a frame spike. A syntax error or a physics regression fails loudly instead of surfacing at runtime:
 
 ```bash
 GODOT=/path/to/godot ./tools/check.sh
