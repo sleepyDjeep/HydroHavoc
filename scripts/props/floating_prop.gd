@@ -14,6 +14,35 @@ enum PropClass {
 	STREAMER_MASCOT
 }
 
+## Visual-only sizing. Props are read from a camera roughly 20 m out, so a prop needs
+## to occupy tens of pixels at 720p to be identifiable at all. Each class is normalised
+## to a target height in metres regardless of how big its source mesh happens to be
+## (the gift crate GLB is a fraction of the duck). The physics offsets below
+## (_get_prop_y_offset, advection, bed clamping) are deliberately not part of this.
+const TARGET_VISUAL_HEIGHT: Dictionary = {
+	PropClass.RUBBER_DUCK: 1.7,
+	PropClass.GIFT_CRATE: 1.35,
+	PropClass.HEAVY_ANCHOR: 2.6, # stands on the bed: it has to clear deep water to be seen
+	PropClass.STREAMER_MASCOT: 2.2,
+}
+
+## Skinned models report bind-pose bounds that do not match their rendered size, so a
+## measured fit would make the mascot metres tall. These classes use an explicit
+## multiplier against their authored geometry instead and assume the target height
+## above when seating and placing the nameplate.
+const EXPLICIT_VISUAL_SCALE: Dictionary = {
+	PropClass.STREAMER_MASCOT: 1.45, # authored model renders ~1.6 m at scale 1.0
+}
+
+## Share of the visual height that sits below the node origin (the water line) so a
+## scaled-up prop still looks like it is floating rather than hovering.
+const SUBMERGE_FRACTION: Dictionary = {
+	PropClass.RUBBER_DUCK: 0.30,
+	PropClass.GIFT_CRATE: 0.25,
+	PropClass.HEAVY_ANCHOR: 0.12, # physics pins the anchor 0.25 m above the bed
+	PropClass.STREAMER_MASCOT: 0.30,
+}
+
 @export var prop_class: PropClass = PropClass.RUBBER_DUCK
 @export var donor_name: String = "Viewer"
 @export var gift_tier: String = "Rose"
@@ -30,6 +59,7 @@ var life_time: float = 0.0
 # Visual references
 var visual_mesh: Node3D
 var nameplate_label: Label3D
+var visual_top: float = 0.0 # local height of the fitted geometry, used by the nameplate
 
 func _ready() -> void:
 	rocking_seed = randf() * 100.0
@@ -45,8 +75,7 @@ func setup(p_sim: FluidSim, p_class: PropClass, p_donor: String, p_tier: String,
 	gift_value = p_val
 
 	if nameplate_label:
-		nameplate_label.text = _format_nameplate()
-		nameplate_label.modulate = _get_tier_color()
+		_place_nameplate()
 
 	# setup() may arrive after the node is already in the tree, in which case _ready()
 	# already built visuals for the default class. Rebuild them for the real one.
@@ -59,10 +88,15 @@ func _format_nameplate() -> String:
 func _rebuild_visuals() -> void:
 	if is_instance_valid(visual_mesh):
 		visual_mesh.queue_free()
-	visual_mesh = null
+		visual_mesh = null
 	_build_visuals()
+	if nameplate_label:
+		_place_nameplate()
 
 func _process(delta: float) -> void:
+	if nameplate_label and is_inside_tree():
+		_place_nameplate_top_level()
+
 	if not fluid_sim or has_plunged:
 		# In freefall down abyss
 		vertical_vel -= 18.0 * delta
@@ -161,15 +195,34 @@ func trigger_steam_boil() -> void:
 
 func _build_nameplate() -> void:
 	nameplate_label = Label3D.new()
+	# Top level so the plate tracks the prop in world space: as a child it inherited the
+	# prop's wave rocking, which slid the text sideways off the thing it labels.
+	nameplate_label.top_level = true
 	nameplate_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	nameplate_label.font_size = 24
-	nameplate_label.pixel_size = 0.005
-	nameplate_label.outline_size = 6
+	# A 48 px font at this pixel size is ~0.46 m per line in world space: around 23 px
+	# tall at 720p from the default camera, which stays legible where the old 0.12 m
+	# text did not. Depth testing is off so the plate reads over its own prop and water.
+	nameplate_label.font_size = 48
+	nameplate_label.pixel_size = 0.0095
+	nameplate_label.outline_size = 12
 	nameplate_label.outline_modulate = Color(0.05, 0.05, 0.1, 0.95)
-	nameplate_label.position = Vector3(0, 1.1, 0)
+	nameplate_label.no_depth_test = true
+	nameplate_label.render_priority = 1
 	nameplate_label.text = _format_nameplate()
 	nameplate_label.modulate = _get_tier_color()
 	add_child(nameplate_label)
+	_place_nameplate()
+
+func _place_nameplate() -> void:
+	if not nameplate_label:
+		return
+	nameplate_label.text = _format_nameplate()
+	nameplate_label.modulate = _get_tier_color()
+	if is_inside_tree():
+		_place_nameplate_top_level()
+
+func _place_nameplate_top_level() -> void:
+	nameplate_label.position = global_position + Vector3(0.0, visual_top + 0.55, 0.0)
 
 func _get_tier_color() -> Color:
 	match prop_class:
@@ -194,6 +247,67 @@ func _build_visuals() -> void:
 			_create_anchor_mesh()
 		PropClass.STREAMER_MASCOT:
 			_create_mascot_mesh()
+	_fit_visuals()
+
+## Scales whatever mesh the class built up to its target height and seats it about the
+## node origin, leaving the buoyancy/advection offsets untouched.
+func _fit_visuals() -> void:
+	if not is_instance_valid(visual_mesh):
+		return
+
+	var target: float = _target_visual_height()
+	var submerge: float = _submerge_fraction()
+	var explicit: float = float(EXPLICIT_VISUAL_SCALE.get(prop_class, 0.0))
+
+	if explicit > 0.0:
+		visual_mesh.scale = Vector3.ONE * explicit
+		visual_mesh.position.y = -target * submerge
+		visual_top = target * (1.0 - submerge)
+		return
+
+	var local: AABB = _collect_aabb(visual_mesh, Transform3D.IDENTITY)
+	if local.size.y <= 0.0001:
+		visual_top = 0.0
+		return
+
+	var current: float = local.size.y * visual_mesh.scale.y
+	if current > 0.0001 and target > 0.0:
+		visual_mesh.scale = visual_mesh.scale * (target / current)
+
+	# Place the geometry so SUBMERGE_FRACTION of its height sits below the origin,
+	# which the physics offsets clamp to the water surface.
+	var scale_y: float = visual_mesh.scale.y
+	visual_mesh.position.y = -(local.position.y + local.size.y * submerge) * scale_y
+	visual_top = local.size.y * (1.0 - submerge) * scale_y
+
+func _target_visual_height() -> float:
+	return float(TARGET_VISUAL_HEIGHT.get(prop_class, 1.6))
+
+func _submerge_fraction() -> float:
+	return float(SUBMERGE_FRACTION.get(prop_class, 0.25))
+
+## Union of every mesh below `node`, expressed in the given space. Models arrive with
+## their own pivots and nested nodes, so the extents have to be measured, not assumed.
+func _collect_aabb(node: Node3D, xform: Transform3D) -> AABB:
+	var box: AABB = AABB()
+	var has_box: bool = false
+
+	for child in node.get_children():
+		if not child is Node3D:
+			continue
+		var child_xform: Transform3D = xform * child.transform
+
+		if child is MeshInstance3D and child.mesh:
+			var mesh_box: AABB = child_xform * child.mesh.get_aabb()
+			box = mesh_box if not has_box else box.merge(mesh_box)
+			has_box = true
+
+		var child_box: AABB = _collect_aabb(child, child_xform)
+		if child_box.size != Vector3.ZERO:
+			box = child_box if not has_box else box.merge(child_box)
+			has_box = true
+
+	return box if has_box else AABB()
 
 func _create_duck_mesh() -> void:
 	visual_mesh = Node3D.new()
@@ -291,11 +405,23 @@ func _create_anchor_mesh() -> void:
 	# Cross Stock
 	var stock: MeshInstance3D = MeshInstance3D.new()
 	var b: BoxMesh = BoxMesh.new()
-	b.size = Vector3(0.65, 0.09, 0.09)
+	b.size = Vector3(0.65, 0.06, 0.06)
 	stock.mesh = b
 	stock.position = Vector3(0, 0.26, 0)
 	stock.material_override = mat_iron
 	visual_mesh.add_child(stock)
+
+	# Ring at the shank head. Without it the silhouette reads as a plain "T" from the
+	# game camera, which is not enough to tell an anchor from the other props.
+	var ring: MeshInstance3D = MeshInstance3D.new()
+	var torus: TorusMesh = TorusMesh.new()
+	torus.inner_radius = 0.06
+	torus.outer_radius = 0.13
+	ring.mesh = torus
+	ring.position = Vector3(0, 0.47, 0)
+	ring.rotation_degrees = Vector3(90, 0, 0)
+	ring.material_override = mat_iron
+	visual_mesh.add_child(ring)
 
 	# Base Flukes Curved Bar
 	var fluke: MeshInstance3D = MeshInstance3D.new()

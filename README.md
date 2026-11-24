@@ -17,7 +17,7 @@ A 2.5D water-puzzle game in the spirit of *Wetrix*, built in Godot 4.7 with a st
 - **Abilities on `1` / `2` / `3`** — Flash Freeze (10 s cooldown), Solar Ray (4 s), Seismic Anchor (12 s). Each is gated by its own cooldown and the HUD buttons show the remaining seconds and disable themselves (`scripts/core/game_manager.gd`, `scripts/ui/game_hud.gd`).
 - **Scoring** — only evaporation scores. Boiling standing water with a fireball, Solar Ray or sponge raises a multiplier; the multiplier decays back to 1x after 5 s without a boil.
 - **Spill pressure** — spilled volume fills the drain meter against a 35 L earthquake threshold. Crossing it shatters random wall cells, shakes the camera and resets the meter. It does not end the run.
-- **Floating props** — four classes with distinct geometry: rubber duck, gift crate (`assets/models/props/gift_crate.glb`), heavy anchor and streamer mascot (`assets/models/characters/streamer_mascot.glb`). They are buoyant, drift with surface flow, tilt with the wave field, boil away for bonus points inside a steam radius and plunge if they reach the rim.
+- **Floating props** — four classes with distinct geometry: rubber duck, gift crate (`assets/models/props/gift_crate.glb`), heavy anchor and streamer mascot (`assets/models/characters/streamer_mascot.glb`). Each class is normalised to a target height between 1.35 m (crate) and 2.6 m (anchor) so it is identifiable at 720p from the default camera, with a donor nameplate above it. They are buoyant, drift with surface flow, tilt with the wave field, boil away for bonus points inside a steam radius and plunge if they reach the rim.
 - **Mock audience dock** — HUD buttons inject Bits (100/500/1000) and TikTok gifts (Rose, Galaxy, Lion); `Tab` injects a random 100-Bit event. These call `StreamEventManager.simulate_*` directly. Nothing is read from a network socket yet.
 - **Two camera/HUD arrangements** — `T` swaps the HUD into its portrait arrangement and pulls the camera back with a wider field of view (16:9 ↔ 9:16 framing).
 
@@ -28,7 +28,7 @@ A 2.5D water-puzzle game in the spirit of *Wetrix*, built in Godot 4.7 with a st
 - **No menu, pause, settings, audio, or save.** One hand-built starting map.
 - **Web export is untested.** The presets exist (`export_presets.cfg`), but the exported build in `docs/` has not been verified in a browser by this project.
 - **Placeholder art throughout.** Procedural meshes and shaders; the gift crate has no texture; splash rings are opaque white torus meshes and the steam puff is an oversized sphere.
-- **Known visual defects.** Water edges and foam read badly at the default camera; props are small and their nameplates are hard to read without zooming.
+- **Known visual defects.** Water edges and foam read badly at the default camera; the gift crate GLB ships without a texture and renders as a blank box; the anchor sinks to the bed, so in water deeper than about 1.8 m only its crown shows.
 - **Performance is unmeasured.** No frame-time or CPU budget has been recorded for either target.
 
 ## Controls

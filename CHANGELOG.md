@@ -2,6 +2,17 @@
 
 All notable changes to this project are recorded here. Dates are commit dates; the project has no tagged releases yet, so the version numbers below are provisional labels for the two milestones so far.
 
+## [Unreleased]
+
+### Changed
+
+- Prop visuals are normalised to per-class target heights (1.35 m crate, 1.7 m duck, 2.2 m mascot, 2.6 m anchor) instead of whatever their source mesh happened to be, so every class is identifiable at 720p from the default camera. The anchor gained a ring at its shank head so its silhouette reads as an anchor rather than a "T". Buoyancy, advection and bed-clamping offsets are unchanged.
+- Donor nameplates scaled up to roughly 0.46 m per line (~23 px at 720p) with a heavier outline and no depth test.
+
+### Fixed
+
+- Nameplates inherited the prop's wave rocking and slid sideways off the prop they label; they are now top-level nodes pinned above it.
+
 ## [0.1.1] - 2026-11-24
 
 Truth pass on what the prototype actually shows, plus the first script checks.
