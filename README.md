@@ -66,11 +66,13 @@ godot --path .
 
 ### Checking the scripts
 
-`tools/check.sh` imports the project, parses every script with a real Godot binary, then runs `tests/sim_invariants.gd` — a seeded, scripted run that asserts water mass conservation, no non-finite field values, no leaked or orphaned props, and that the fixed-step sim's catch-up cap holds under a frame spike. A syntax error or a physics regression fails loudly instead of surfacing at runtime:
+`tools/check.sh` imports the project, parses every script with a real Godot binary, then runs the tests: `tests/sim_invariants.gd` (a seeded, scripted run that asserts water mass conservation, no non-finite field values, no leaked or orphaned props, and that the fixed-step sim's catch-up cap holds under a frame spike), `tests/name_policy_test.gd`, and `tests/prop_size.gd`. A syntax error or a physics regression fails loudly instead of surfacing at runtime:
 
 ```bash
 GODOT=/path/to/godot ./tools/check.sh
 ```
+
+The last step is the rendered silhouette check, `tests/measure_props.gd`. It needs a real framebuffer, so the gate runs it when a display is available (Windows, or `DISPLAY`/`WAYLAND_DISPLAY` set) and prints `SKIP prop silhouettes: no display available` on headless CI, which stays green. On a desktop the pixels you actually ship are compared to the baseline every run; `MEASURE_PROPS=0` skips the step for a quick iteration and `MEASURE_PROPS=1` forces it.
 
 ## Project layout
 
@@ -97,7 +99,7 @@ Last checked on 2026-11-24 with Godot 4.7.2:
 
 - `--headless --import` completed and all 12 scripts passed `--check-only`.
 - Prop sizes are part of the gate: `tests/prop_size.gd` runs headless and compares each class's target height, fitted scale, seating and 720p projected extent against `tests/prop_size_baseline.json`, so a sizing change fails CI without a window.
-- Rendered silhouettes are pinned separately in `tests/prop_silhouette_720p.json` (duck 59x53, crate 40x48, anchor 73x48, mascot 78x69 px, nameplate line 26 px). `tests/measure_props.gd` reproduces them; it needs a real window, so it stays a manual check.
+- Rendered silhouettes are pinned separately in `tests/prop_silhouette_720p.json` (duck 59x53, crate 40x48, anchor 73x48, mascot 78x69 px, nameplate line 26 px). `tests/measure_props.gd` reproduces them and is the gate's last step wherever a display exists; headless runs skip it with a message instead of failing.
 - A scripted windowed boot of `scenes/main.tscn` ran 37 assertions with 0 failures: all four prop classes spawned with distinct geometry, the top-bar meters were measured clear of the score box, abilities `1`/`2`/`3` bound to the expected keycodes and applied their cooldowns, and no non-ASCII text was left in runtime strings.
 
 Not verified: performance, the web export, the 9:16 layout on a portrait canvas, and any real platform API.

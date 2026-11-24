@@ -1,15 +1,17 @@
 extends SceneTree
 
 ## Windowed 720p silhouette check for the props and their nameplates, compared against the
-## tracked baseline in tools/prop_silhouette_720p.json. "The duck did not move" is then a
+## tracked baseline in tests/prop_silhouette_720p.json. "The duck did not move" is then a
 ## number in the repo rather than a claim in a chat log:
 ##
-##   "$GODOT" --path . --script res://tools/measure_props.gd
-##   "$GODOT" --path . --script res://tools/measure_props.gd -- --update-baseline
+##   "$GODOT" --path . --script res://tests/measure_props.gd
+##   "$GODOT" --path . --script res://tests/measure_props.gd -- --update-baseline
 ##
-## Deliberately not part of tools/check.sh: it needs a real framebuffer and a window, and
-## headless CI has neither. Props sit fully inside the frame and the sim is stepped a fixed
-## number of times, so two runs are comparable. PNGs land in .verify/ (gitignored).
+## tools/check.sh runs this whenever a display is present and prints a SKIP when it is not,
+## so headless CI stays green while a desktop gate measures real pixels. It cannot run
+## headless: the dummy rendering driver hangs on the SubViewport readback. Props sit fully
+## inside the frame and the sim is stepped a fixed number of times, so two runs are
+## comparable. PNGs land in .verify/ (gitignored).
 
 const VIEW: Vector2i = Vector2i(1280, 720)
 const KEY: Color = Color(1.0, 0.0, 1.0)

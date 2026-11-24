@@ -17,6 +17,7 @@ All notable changes to this project are recorded here. Dates are commit dates; t
 
 ### Changed
 
+- `tools/check.sh` runs the rendered silhouette harness (`tests/measure_props.gd`) whenever a display is available, so a prop-size regression is caught on a developer machine as well as by the headless gate; without a display it prints `SKIP prop silhouettes: no display available` and stays green, which is what headless CI sees. `MEASURE_PROPS=0`/`=1` overrides the detection.
 - The fluid sim steps at most 4 fixed ticks per frame and drops any further backlog, so a single long frame can no longer put the sim into permanent catch-up.
 - Prop visuals are normalised to per-class target heights (1.35 m crate, 1.7 m duck, 2.2 m mascot, 2.6 m anchor) instead of whatever their source mesh happened to be, so every class is identifiable at 720p from the default camera. The anchor gained a ring at its shank head so its silhouette reads as an anchor rather than a "T". Buoyancy, advection and bed-clamping offsets are unchanged.
 - Donor nameplates scaled up to roughly 0.46 m per line (~23 px at 720p) with a heavier outline and no depth test.

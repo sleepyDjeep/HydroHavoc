@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Imports the project and parses every GDScript with a real Godot binary.
+# The local and CI gate: imports the project and parses every GDScript with a real Godot
+# binary, then runs the headless tests and, where a display exists, the rendered silhouette
+# check.
 #
 #   GODOT=/path/to/godot ./tools/check.sh
+#   MEASURE_PROPS=0 GODOT=... ./tools/check.sh   # skip the windowed step on a desktop
 #
-# Exits non-zero if the import fails or any script fails to parse.
+# Exits non-zero if any step fails. Headless runs print a SKIP for the windowed step rather
+# than failing, so the same script works in CI and on a developer machine.
 
 set -uo pipefail
 
@@ -91,3 +95,35 @@ if ! "$GODOT" --headless --path "$ROOT" --script "res://tests/prop_size.gd"; the
 fi
 
 echo "OK: prop sizes match the baseline."
+
+echo "== prop silhouettes =="
+# The rendered check needs a real framebuffer, so it runs only where a display exists: CI
+# stays green and headless, while a developer machine measures the actual pixels instead of
+# relying on someone remembering to run the harness by hand. MEASURE_PROPS=0 skips it
+# (fast iteration), MEASURE_PROPS=1 forces it.
+windowed=0
+case "${OS:-}:$(uname -s)" in
+	*Windows_NT*|MINGW*|MSYS*|CYGWIN*) windowed=1 ;;
+esac
+if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+	windowed=1
+fi
+case "${MEASURE_PROPS:-}" in
+	0) windowed=0 ;;
+	1) windowed=1 ;;
+esac
+
+if [ "$windowed" -eq 0 ]; then
+	echo "SKIP prop silhouettes: no display available, so no pixels can be read (expected on headless CI)."
+	echo "     Run it where a window can open: \"\$GODOT\" --path \"$ROOT\" --script res://tests/measure_props.gd"
+else
+	echo "rendering four props at 1280x720; this takes a minute."
+	if ! "$GODOT" --path "$ROOT" --script "res://tests/measure_props.gd"; then
+		echo "FAIL: rendered prop silhouettes moved away from the baseline (see .verify/*.png)." >&2
+		echo "      If no window could actually open here, rerun with MEASURE_PROPS=0." >&2
+		exit 1
+	fi
+	echo "OK: rendered prop silhouettes match the baseline."
+fi
+
+echo "all checks passed."
