@@ -26,16 +26,26 @@ const TARGET_VISUAL_HEIGHT: Dictionary = {
 	PropClass.STREAMER_MASCOT: 2.2,
 }
 
-## Skinned models report bind-pose bounds that do not match their rendered size, so a
-## measured fit would make the mascot metres tall. These classes use an explicit
-## multiplier against their authored geometry instead and assume the target height
-## above when seating and placing the nameplate.
-const EXPLICIT_VISUAL_SCALE: Dictionary = {
-	PropClass.STREAMER_MASCOT: 1.45, # authored model renders ~1.6 m at scale 1.0
-}
+## The mascot is skinned and its meshes sit under a 0.01-scale node, so its measured
+## bounds are ~100x smaller than what the renderer draws (a fitted scale made it metres
+## tall). It uses an explicit multiplier instead, and assumes TARGET_VISUAL_HEIGHT when
+## seating and placing the nameplate.
+const MASCOT_VISUAL_SCALE: float = 1.45 # authored model renders ~1.6 m at scale 1.0
 
-## Share of the visual height that sits below the node origin (the water line) so a
-## scaled-up prop still looks like it is floating rather than hovering.
+## A fitted scale outside this band almost always means the model's reported bounds do
+## not match what renders (the skinned-mascot problem, ~94x). Warn rather than quietly
+## ship a prop the size of a building; see MASCOT_VISUAL_SCALE for the known exception.
+const MIN_FIT_FACTOR: float = 0.2
+const MAX_FIT_FACTOR: float = 10.0
+
+## Share of the visual height that sits below the node origin, so a scaled-up prop still
+## looks like it is floating rather than hovering.
+##
+## This stacks with _get_prop_y_offset(), which lifts the whole node again by 0.1-0.45 m
+## per class. The node origin ends up offset twice, and the effective waterline is
+##     draft = SUBMERGE_FRACTION * visual height - _get_prop_y_offset()
+## so the two tables must be tuned together: moving one alone shifts every prop up or
+## down in the water.
 const SUBMERGE_FRACTION: Dictionary = {
 	PropClass.RUBBER_DUCK: 0.30,
 	PropClass.GIFT_CRATE: 0.25,
@@ -77,7 +87,7 @@ func setup(p_sim: FluidSim, p_class: PropClass, p_donor: String, p_tier: String,
 	gift_value = p_val
 
 	if nameplate_label:
-		_place_nameplate()
+		_refresh_nameplate()
 
 	# setup() may arrive after the node is already in the tree, in which case _ready()
 	# already built visuals for the default class. Rebuild them for the real one.
@@ -93,11 +103,10 @@ func _rebuild_visuals() -> void:
 		visual_mesh = null
 	_build_visuals()
 	if nameplate_label:
-		_place_nameplate()
+		_refresh_nameplate()
 
 func _process(delta: float) -> void:
-	if nameplate_label and is_inside_tree():
-		_place_nameplate_top_level()
+	_track_nameplate()
 
 	if not fluid_sim or has_plunged:
 		# In freefall down abyss
@@ -210,21 +219,21 @@ func _build_nameplate() -> void:
 	nameplate_label.outline_modulate = Color(0.05, 0.05, 0.1, 0.95)
 	nameplate_label.no_depth_test = true
 	nameplate_label.render_priority = 1
-	nameplate_label.text = _format_nameplate()
-	nameplate_label.modulate = _get_tier_color()
 	add_child(nameplate_label)
-	_place_nameplate()
+	_refresh_nameplate()
 
-func _place_nameplate() -> void:
+func _refresh_nameplate() -> void:
 	if not nameplate_label:
 		return
 	nameplate_label.text = _format_nameplate()
 	nameplate_label.modulate = _get_tier_color()
-	if is_inside_tree():
-		_place_nameplate_top_level()
+	_track_nameplate()
 
-func _place_nameplate_top_level() -> void:
-	nameplate_label.position = global_position + Vector3(0.0, visual_top + 0.55, 0.0)
+## Called every frame: the plate is a top-level node pinned in world space, so it does not
+## inherit the prop's rocking rotation (which used to slide it sideways off the prop).
+func _track_nameplate() -> void:
+	if nameplate_label and is_inside_tree():
+		nameplate_label.position = global_position + Vector3(0.0, visual_top + 0.55, 0.0)
 
 func _get_tier_color() -> Color:
 	match prop_class:
@@ -257,12 +266,12 @@ func _fit_visuals() -> void:
 	if not is_instance_valid(visual_mesh):
 		return
 
-	var target: float = _target_visual_height()
-	var submerge: float = _submerge_fraction()
-	var explicit: float = float(EXPLICIT_VISUAL_SCALE.get(prop_class, 0.0))
+	# Every class has an entry in both tables, so index rather than default.
+	var target: float = TARGET_VISUAL_HEIGHT[prop_class]
+	var submerge: float = SUBMERGE_FRACTION[prop_class]
 
-	if explicit > 0.0:
-		visual_mesh.scale = Vector3.ONE * explicit
+	if prop_class == PropClass.STREAMER_MASCOT:
+		visual_mesh.scale = Vector3.ONE * MASCOT_VISUAL_SCALE
 		visual_mesh.position.y = -target * submerge
 		visual_top = target * (1.0 - submerge)
 		return
@@ -273,23 +282,25 @@ func _fit_visuals() -> void:
 		return
 
 	var current: float = local.size.y * visual_mesh.scale.y
-	if current > 0.0001 and target > 0.0:
-		visual_mesh.scale = visual_mesh.scale * (target / current)
+	var factor: float = target / maxf(current, 0.0001)
+	if factor < MIN_FIT_FACTOR or factor > MAX_FIT_FACTOR:
+		# The fit is applied anyway so the prop is still visible, but a wrong-sized prop is
+		# now a log line instead of a mystery.
+		push_warning("%s: fitted scale %.1fx is outside %.2f-%.1f; check that the model's bounds match what renders"
+			% [PropClass.keys()[prop_class], factor, MIN_FIT_FACTOR, MAX_FIT_FACTOR])
+	visual_mesh.scale = visual_mesh.scale * factor
 
-	# Place the geometry so SUBMERGE_FRACTION of its height sits below the origin,
-	# which the physics offsets clamp to the water surface.
+	# Seat the geometry so SUBMERGE_FRACTION of its measured height sits below the node
+	# origin, which the physics offsets clamp to the water surface.
 	var scale_y: float = visual_mesh.scale.y
 	visual_mesh.position.y = -(local.position.y + local.size.y * submerge) * scale_y
 	visual_top = local.size.y * (1.0 - submerge) * scale_y
 
-func _target_visual_height() -> float:
-	return float(TARGET_VISUAL_HEIGHT.get(prop_class, 1.6))
-
-func _submerge_fraction() -> float:
-	return float(SUBMERGE_FRACTION.get(prop_class, 0.25))
-
 ## Union of every mesh below `node`, expressed in the given space. Models arrive with
-## their own pivots and nested nodes, so the extents have to be measured, not assumed.
+## their own pivots, nested nodes and non-uniform child scales, so the extents have to be
+## measured rather than assumed. Returns AABB() (zero size) when there is no geometry;
+## the has_box flag exists because merging into a fresh AABB would add the origin.
+## Only valid for rigid geometry: see MASCOT_VISUAL_SCALE for the skinned exception.
 func _collect_aabb(node: Node3D, xform: Transform3D) -> AABB:
 	var box: AABB = AABB()
 	var has_box: bool = false
@@ -419,6 +430,8 @@ func _create_anchor_mesh() -> void:
 	var torus: TorusMesh = TorusMesh.new()
 	torus.inner_radius = 0.06
 	torus.outer_radius = 0.13
+	torus.rings = 10
+	torus.ring_segments = 12 # ~10 px on screen: the default 64x32 is wasted geometry
 	ring.mesh = torus
 	ring.position = Vector3(0, 0.47, 0)
 	ring.rotation_degrees = Vector3(90, 0, 0)
