@@ -12,6 +12,19 @@ extends SceneTree
 ## headless: the dummy rendering driver hangs on the SubViewport readback. Props sit fully
 ## inside the frame and the sim is stepped a fixed number of times, so two runs are
 ## comparable. PNGs land in .verify/ (gitignored).
+##
+## The water surface is hidden for the keyed captures. It is translucent and clips whatever sits
+## below the waterline, and that waterline is not reproducible: the surface shader displaces
+## vertices by TIME, and the level after the settle ticks depends on the stream events those
+## ticks happen to roll (unseeded). Five captures of the mascot through water read 1644-1646
+## px2 at a 1.71 m surface, while the same geometry read 1677 px2 at 2.21 m; the tracked
+## baseline had 1522 from yet another level, 10% away with the silhouette unchanged. With the
+## water hidden the number is the prop's own pixels and repeats exactly.
+##
+## The world is seeded for the same reason: the settle ticks drive the real game manager, and
+## unseeded stream events move water around, which moves every prop by a few cm between
+## launches. With the seed fixed and the water hidden, four consecutive runs measured the same
+## four silhouettes to the pixel.
 
 const VIEW: Vector2i = Vector2i(1280, 720)
 const KEY: Color = Color(1.0, 0.0, 1.0)
@@ -23,10 +36,11 @@ const BASELINE_PATH: String = "res://tests/prop_silhouette_720p.json"
 ## Measured edges move by about a pixel between runs (antialiasing), so the baseline is a
 ## band rather than an exact value.
 const SIZE_TOLERANCE_PX: int = 2
-## Area is the noisiest number here: the water surface moves by a frame between runs and
-## translucent water in front of a prop drops pixels out of the key. Size is the stable
-## signal; area only catches gross regressions.
-const AREA_TOLERANCE_PCT: float = 15.0
+## Area repeats to about a pixel with the water hidden; what still moves is where the prop sits
+## on screen, because its height is taken from the water level and that differs by a few cm
+## between runs (~2 px, ~2% of a silhouette). 5% therefore flags a real change in shape while
+## leaving that positional wobble alone.
+const AREA_TOLERANCE_PCT: float = 5.0
 
 var checks: int = 0
 var failures: int = 0
@@ -83,26 +97,30 @@ func _meshes(node: Node, out: Array) -> void:
 			out.append(child)
 		_meshes(child, out)
 
+## Reads the size from the image instead of assuming VIEW: a readback at a different
+## resolution would map every sample to the wrong pixel and report a smeared silhouette.
 func _key_area(img: Image) -> Dictionary:
+	var w: int = img.get_width()
+	var h: int = img.get_height()
 	var mask: PackedByteArray = PackedByteArray()
-	mask.resize(VIEW.x * VIEW.y)
-	for y in range(VIEW.y):
-		for x in range(VIEW.x):
+	mask.resize(w * h)
+	for y in range(h):
+		for x in range(w):
 			var c: Color = img.get_pixel(x, y)
-			mask[y * VIEW.x + x] = 1 if (c.r > 0.30 and c.b > 0.30 and c.g < 0.45 * c.r and c.g < 0.45 * c.b) else 0
+			mask[y * w + x] = 1 if (c.r > 0.30 and c.b > 0.30 and c.g < 0.45 * c.r and c.g < 0.45 * c.b) else 0
 
-	var min_x: int = VIEW.x
-	var min_y: int = VIEW.y
+	var min_x: int = w
+	var min_y: int = h
 	var max_x: int = -1
 	var max_y: int = -1
 	var area: int = 0
-	for y in range(1, VIEW.y - 1):
-		for x in range(1, VIEW.x - 1):
-			if mask[y * VIEW.x + x] == 0:
+	for y in range(1, h - 1):
+		for x in range(1, w - 1):
+			if mask[y * w + x] == 0:
 				continue
-			if mask[(y - 1) * VIEW.x + x] == 0 or mask[(y + 1) * VIEW.x + x] == 0:
+			if mask[(y - 1) * w + x] == 0 or mask[(y + 1) * w + x] == 0:
 				continue
-			if mask[y * VIEW.x + (x - 1)] == 0 or mask[y * VIEW.x + (x + 1)] == 0:
+			if mask[y * w + (x - 1)] == 0 or mask[y * w + (x + 1)] == 0:
 				continue
 			area += 1
 			min_x = mini(min_x, x)
@@ -113,6 +131,27 @@ func _key_area(img: Image) -> Dictionary:
 	if area == 0:
 		return {"area": 0, "w": 0, "h": 0}
 	return {"area": area, "w": max_x - min_x + 1, "h": max_y - min_y + 1}
+
+## The window can still be settling right after it opens: a readback then is a partially
+## updated frame, which shows up as keyed pixels scattered away from the prop (the first launch
+## of a run measured 145x101 for a 59x53 duck, with the area barely changed). With the water
+## and the plates hidden the keyed frame is static, so requiring two identical frames in a row
+## waits that out and costs one frame.
+func _settled_frame() -> Image:
+	var prev: PackedByteArray = PackedByteArray()
+	var img: Image = null
+	for i in range(12):
+		await process_frame
+		img = root.get_viewport().get_texture().get_image()
+		if img.get_size() != VIEW:
+			prev = PackedByteArray()
+			continue
+		var data: PackedByteArray = img.get_data()
+		if not prev.is_empty() and data == prev:
+			return img
+		prev = data
+	push_error("viewport frame never settled at %s" % str(VIEW))
+	return img
 
 func _load_baseline() -> Dictionary:
 	if not FileAccess.file_exists(BASELINE_PATH):
@@ -167,6 +206,14 @@ func _run() -> void:
 	var measured_line_px: int = 0
 	DirAccess.make_dir_recursive_absolute(OUT_DIR)
 
+	# Unseeded randomness makes the settle ticks roll different stream events on every launch
+	# (an earthquake shoves water around, gifts drop props into the lake), which moved the water
+	# level by ~4 cm and therefore every prop's height: the mascot sat at 2.2068 in one run and
+	# 2.2471 in the next, a 1-2 px screen shift that flipped silhouette edges all over its body
+	# and swung its keyed area between 1603 and 1816 px2 at an identical bounding box. Pin the
+	# global RNG before the scene is built so each run starts from the same world.
+	seed(0)
+
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame
@@ -174,6 +221,7 @@ func _run() -> void:
 
 	var cam: Camera3D = main.get_node("CameraPivot/Camera3D")
 	var pm: PropManager = main.get_node("Arena/PropManager")
+	var water: MeshInstance3D = main.get_node("Arena/WaterMeshInstance")
 	# Own the layout clock as well: left automatic, the manager re-lays the plates out on
 	# every awaited frame while the labels stay where the harness last put them, so the
 	# measurement would mix a fresh layout with stale label positions.
@@ -249,6 +297,9 @@ func _run() -> void:
 
 	var lines: PackedStringArray = PackedStringArray()
 	print("--- silhouette at %dx%d, %d settle ticks ---" % [VIEW.x, VIEW.y, SETTLE_TICKS])
+	# Off for the whole keyed section: the surface would clip each prop at a waterline that is
+	# not reproducible run to run (see the header). Restored before the clean captures below.
+	water.visible = false
 	for i in range(props.size()):
 		var prop: FloatingProp = props[i]
 		var spec: Array = specs[i]
@@ -263,9 +314,7 @@ func _run() -> void:
 			originals[mi] = mi.material_override
 			mi.material_override = key_mat
 		_set_plates_visible(props, false)
-		for f in range(3):
-			await process_frame
-		var frame: Image = root.get_viewport().get_texture().get_image()
+		var frame: Image = await _settled_frame()
 		_set_plates_visible(props, true)
 		for mi in meshes:
 			mi.material_override = originals[mi]
@@ -285,6 +334,7 @@ func _run() -> void:
 		measured_line_px = int(round((b - a).length()))
 		_ok(measured_line_px >= 11, spec[1] + " plate legible", "%d px line" % measured_line_px)
 
+	water.visible = true
 	for f in range(3):
 		await process_frame
 	var clean: Image = root.get_viewport().get_texture().get_image()

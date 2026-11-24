@@ -2,28 +2,28 @@
 	"nameplate_line_px": 26,
 	"props": {
 		"Gift Crate": {
-			"area": 1622,
-			"h": 48,
-			"w": 40
+			"area": 1945,
+			"h": 57,
+			"w": 41
 		},
 		"Heavy Anchor": {
-			"area": 1338,
-			"h": 48,
-			"w": 73
+			"area": 2591,
+			"h": 85,
+			"w": 74
 		},
 		"Rubber Duck": {
-			"area": 2454,
-			"h": 53,
+			"area": 2493,
+			"h": 55,
 			"w": 59
 		},
 		"Streamer Mascot": {
-			"area": 1522,
-			"h": 69,
+			"area": 1598,
+			"h": 95,
 			"w": 78
 		}
 	},
 	"tolerance": {
-		"area_percent": 8.0,
+		"area_percent": 5.0,
 		"size_px": 2
 	},
 	"view": "1280x720, default camera, 16:9"

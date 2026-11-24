@@ -99,7 +99,7 @@ Last checked on 2026-11-24 with Godot 4.7.2:
 
 - `--headless --import` completed and all 12 scripts passed `--check-only`.
 - Prop sizes are part of the gate: `tests/prop_size.gd` runs headless and compares each class's target height, fitted scale, seating and 720p projected extent against `tests/prop_size_baseline.json`, so a sizing change fails CI without a window.
-- Rendered silhouettes are pinned separately in `tests/prop_silhouette_720p.json` (duck 59x53, crate 40x48, anchor 73x48, mascot 78x69 px, nameplate line 26 px). `tests/measure_props.gd` reproduces them and is the gate's last step wherever a display exists; headless runs skip it with a message instead of failing.
+- Rendered silhouettes are pinned separately in `tests/prop_silhouette_720p.json` (duck 59x55, crate 41x57, anchor 74x85, mascot 78x95 px, nameplate line 26 px; the keyed captures hide the water, so each silhouette is the prop's own pixels rather than what the waterline happens to leave showing). `tests/measure_props.gd` reproduces them to the pixel — it seeds the world, waits for the frame to stop changing, and four consecutive runs measured 0.0% drift — and it is the gate's last step wherever a display exists; headless runs skip it with a message instead of failing.
 - A scripted windowed boot of `scenes/main.tscn` ran 37 assertions with 0 failures: all four prop classes spawned with distinct geometry, the top-bar meters were measured clear of the score box, abilities `1`/`2`/`3` bound to the expected keycodes and applied their cooldowns, and no non-ASCII text was left in runtime strings.
 
 Not verified: performance, the web export, the 9:16 layout on a portrait canvas, and any real platform API.
