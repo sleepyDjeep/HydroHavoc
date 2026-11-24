@@ -6,6 +6,8 @@ extends Node3D
 
 const SPILL_THRESHOLD: float = 35.0 # Liters before earthquake triggers
 const TICK_RATE: float = 1.0 / 30.0 # 30Hz fluid sim step
+const WATER_CAPACITY: float = 1228.8 # 32x32 cells at 1.2 depth: the arena completely awash
+const ABILITY_COOLDOWNS: Array[float] = [10.0, 4.0, 12.0]
 
 @onready var terrain_mesh_instance: MeshInstance3D = $Arena/TerrainMeshInstance
 @onready var water_mesh_instance: MeshInstance3D = $Arena/WaterMeshInstance
@@ -38,6 +40,8 @@ var sim_accum: float = 0.0
 var screen_shake_intensity: float = 0.0
 var is_frozen: bool = false
 var freeze_timer: float = 0.0
+var ability_cooldowns: Array[float] = [0.0, 0.0, 0.0]
+var water_mesh_revision: int = -1
 
 func _ready() -> void:
 	_init_simulation()
@@ -115,6 +119,7 @@ func _process(delta: float) -> void:
 	_handle_camera_shake(delta)
 	_handle_combo_decay(delta)
 	_handle_freeze(delta)
+	_handle_ability_cooldowns(delta)
 
 	# Fluid simulation stepped at fixed tick rate
 	if not is_frozen:
@@ -122,11 +127,14 @@ func _process(delta: float) -> void:
 		while sim_accum >= TICK_RATE:
 			sim.step(TICK_RATE)
 			sim_accum -= TICK_RATE
-		rebuild_water()
+
+	# Rebuilds only when the simulation revision moved (see rebuild_water)
+	rebuild_water()
 
 	# Update HUD telemetry
-	hud.update_water_stats(sim.active_water_volume, 120.0)
+	hud.update_water_stats(sim.active_water_volume, WATER_CAPACITY)
 	hud.update_drain_meter(sim.total_spilled_water, SPILL_THRESHOLD)
+	hud.update_ability_cooldowns(ability_cooldowns)
 
 	# Earthquake check on spilled threshold
 	if sim.total_spilled_water >= SPILL_THRESHOLD:
@@ -157,9 +165,13 @@ func _handle_input(_delta: float) -> void:
 	if Input.is_action_just_pressed("toggle_orientation"):
 		hud.toggle_orientation()
 
-	# Testing hotkeys for quick simulated stream gifts
-	if Input.is_key_pressed(KEY_1) and Input.is_action_just_pressed("drop_piece") == false:
-		pass
+	if Input.is_action_just_pressed("ability_1"):
+		_on_ability_triggered(1)
+	if Input.is_action_just_pressed("ability_2"):
+		_on_ability_triggered(2)
+	if Input.is_action_just_pressed("ability_3"):
+		_on_ability_triggered(3)
+
 	if Input.is_action_just_pressed("ui_focus_next"): # Tab for simulated bit donation
 		stream_events.simulate_twitch_event("TwitchFan_" + str(randi() % 99), 100)
 
@@ -267,7 +279,7 @@ func _award_evap_score(evap_vol: float) -> void:
 	
 	score += points
 	hud.update_score(score, multiplier)
-	hud.show_alert("🔥 STEAM EVAPORATION! 🔥", "+" + str(points) + " Points! (x" + str(snappedf(multiplier, 0.1)) + ")", Color(1.0, 0.4, 0.1))
+	hud.show_alert("STEAM EVAPORATION!", "+" + str(points) + " Points! (x" + str(snappedf(multiplier, 0.1)) + ")", Color(1.0, 0.4, 0.1))
 
 func _handle_combo_decay(delta: float) -> void:
 	if combo_timer > 0.0:
@@ -281,10 +293,15 @@ func _handle_freeze(delta: float) -> void:
 		freeze_timer -= delta
 		if freeze_timer <= 0.0:
 			is_frozen = false
-			hud.show_alert("❄️ ICE MELTED! ❄️", "Liquids are flowing again!", Color(0.2, 0.7, 1.0))
+			hud.show_alert("ICE MELTED", "Liquids are flowing again!", Color(0.2, 0.7, 1.0))
+
+func _handle_ability_cooldowns(delta: float) -> void:
+	for i in range(ability_cooldowns.size()):
+		if ability_cooldowns[i] > 0.0:
+			ability_cooldowns[i] = maxf(0.0, ability_cooldowns[i] - delta)
 
 func _trigger_earthquake() -> void:
-	hud.show_alert("⚠️ EARTHQUAKE DISASTER! ⚠️", "Drain exceeded! Arena collapsing!", Color(1.0, 0.1, 0.1))
+	hud.show_alert("EARTHQUAKE DISASTER!", "Drain exceeded! Arena collapsing!", Color(1.0, 0.1, 0.1))
 	add_shake(0.85)
 
 	# Shatter 3 random wall cells
@@ -349,11 +366,11 @@ func _on_stream_action(donor: String, action: String, val: int, _platform: Strin
 	rebuild_water()
 
 func _on_prop_vaporized(prop_name: String, donor: String, bonus_pts: int) -> void:
-	hud.show_alert("💥 " + prop_name.to_upper() + " BOILED! 💥", donor + "'s gift vaporized! +" + str(bonus_pts) + " PTS!", Color(1.0, 0.8, 0.2))
+	hud.show_alert(prop_name.to_upper() + " BOILED!", donor + "'s gift vaporized! +" + str(bonus_pts) + " PTS!", Color(1.0, 0.8, 0.2))
 	add_shake(0.2)
 
 func _on_prop_plunged(prop_name: String, donor: String) -> void:
-	hud.show_alert("🌊 WATERFALL PLUNGE! 🌊", "RIP " + donor + "'s " + prop_name + " fell off the edge!", Color(0.9, 0.2, 0.3))
+	hud.show_alert("WATERFALL PLUNGE!", "RIP " + donor + "'s " + prop_name + " fell off the edge!", Color(0.9, 0.2, 0.3))
 	add_shake(0.15)
 
 func _on_stream_alert(title: String, subtitle: String, color: Color) -> void:
@@ -361,21 +378,33 @@ func _on_stream_alert(title: String, subtitle: String, color: Color) -> void:
 	hud.update_vip(stream_events.highest_single_donor, stream_events.highest_single_amount)
 
 func _on_ability_triggered(ability_id: int) -> void:
+	var idx: int = ability_id - 1
+	if idx < 0 or idx >= ability_cooldowns.size():
+		return
+	if ability_cooldowns[idx] > 0.0:
+		hud.show_alert("ABILITY RECHARGING", "Ready in " + str(snappedf(ability_cooldowns[idx], 0.1)) + "s", Color(0.6, 0.65, 0.7))
+		return
+
 	match ability_id:
 		1: # Flash Freeze
 			is_frozen = true
 			freeze_timer = 6.0
-			hud.show_alert("❄️ FLASH FREEZE ACTIVATED! ❄️", "6 seconds of liquid stasis!", Color(0.3, 0.9, 1.0))
+			hud.show_alert("FLASH FREEZE ACTIVATED", "6 seconds of liquid stasis!", Color(0.3, 0.9, 1.0))
 		2: # Solar Ray
 			var evap: float = sim.evaporate_at(cursor_grid_pos.x, cursor_grid_pos.y, 3, 5.0)
-			_award_evap_score(evap)
+			if evap > 0.05:
+				_award_evap_score(evap)
+			else:
+				hud.show_alert("SOLAR RAY MISSED", "Aim at standing water to boil it off.", Color(1.0, 0.6, 0.2))
 			add_shake(0.2)
 		3: # Seismic Anchor
 			for dy in range(-2, 3):
 				for dx in range(-2, 3):
 					sim.add_terrain(cursor_grid_pos.x + dx, cursor_grid_pos.y + dy, 1.0)
 			rebuild_terrain()
-			hud.show_alert("🛡️ SEISMIC ANCHOR! 🛡️", "Reinforced dams!", Color(0.3, 0.9, 0.4))
+			hud.show_alert("SEISMIC ANCHOR", "Reinforced dams!", Color(0.3, 0.9, 0.4))
+
+	ability_cooldowns[idx] = ABILITY_COOLDOWNS[idx]
 
 func _on_sim_event_clicked(event_type: String) -> void:
 	match event_type:
@@ -398,12 +427,12 @@ func _on_toggle_aspect_ratio() -> void:
 		# TikTok 9:16 vertical view: Pull camera back and increase FOV
 		camera_3d.fov = 68.0
 		camera_pivot.position = Vector3(0, 18.0, 18.0)
-		hud.show_alert("📱 VERTICAL TIKTOK MODE (9:16) 📱", "Optimal for TikTok Live stream!", Color(0.9, 0.2, 0.8))
+		hud.show_alert("VERTICAL MODE (9:16)", "Optimal for TikTok Live stream!", Color(0.9, 0.2, 0.8))
 	else:
 		# Standard 16:9 widescreen view
 		camera_3d.fov = 52.0
 		camera_pivot.position = Vector3(0, 14.0, 14.0)
-		hud.show_alert("🖥️ WIDESCREEN TWITCH MODE (16:9) 🖥️", "Standard landscape streaming!", Color(0.2, 0.7, 1.0))
+		hud.show_alert("WIDESCREEN MODE (16:9)", "Standard landscape streaming!", Color(0.2, 0.7, 1.0))
 
 func add_shake(amount: float) -> void:
 	screen_shake_intensity = clampf(screen_shake_intensity + amount, 0.0, 1.0)
@@ -423,5 +452,8 @@ func _handle_camera_shake(delta: float) -> void:
 func rebuild_terrain() -> void:
 	terrain_mesh_instance.mesh = terrain_builder.build_mesh(sim)
 
-func rebuild_water() -> void:
+func rebuild_water(force: bool = false) -> void:
+	if not force and sim.water_revision == water_mesh_revision:
+		return
+	water_mesh_revision = sim.water_revision
 	water_mesh_instance.mesh = water_builder.build_mesh(sim)

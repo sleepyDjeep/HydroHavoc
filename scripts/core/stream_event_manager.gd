@@ -38,29 +38,29 @@ func simulate_twitch_event(donor_name: String, bits: int) -> void:
 		emit_signal("alert_announcement", donor_name + " sent a SPONGE RESCUE!", "Massive lake soak!", Color(0.9, 0.8, 0.1))
 	elif bits < 1000:
 		emit_signal("stream_action_received", donor_name, "TSUNAMI", bits, "Twitch")
-		emit_signal("alert_announcement", "🚨 TSUNAMI ALERT! 🚨", donor_name + " sent " + str(bits) + " Bits!", Color(0.9, 0.2, 0.2))
+		emit_signal("alert_announcement", "TSUNAMI ALERT!", donor_name + " sent " + str(bits) + " Bits!", Color(0.9, 0.2, 0.2))
 	else:
 		emit_signal("stream_action_received", donor_name, "VOLCANO_BOMB", bits, "Twitch")
-		emit_signal("alert_announcement", "💥 APOCALYPSE BOMB! 💥", donor_name + " summoned a Meteor!", Color(1.0, 0.1, 0.3))
+		emit_signal("alert_announcement", "APOCALYPSE BOMB!", donor_name + " summoned a Meteor!", Color(1.0, 0.1, 0.3))
 
 func simulate_tiktok_gift(donor_name: String, gift_name: String, coin_value: int) -> void:
 	_record_donor(donor_name, coin_value)
 	match gift_name.to_lower():
 		"rose":
 			emit_signal("stream_action_received", donor_name, "DUCK_SPLASH", coin_value, "TikTok")
-			emit_signal("alert_announcement", donor_name + " sent a Rose! 🌹", "Mini Splash!", Color(1.0, 0.4, 0.6))
+			emit_signal("alert_announcement", donor_name + " sent a Rose!", "Mini Splash!", Color(1.0, 0.4, 0.6))
 		"ice cream":
 			emit_signal("stream_action_received", donor_name, "WALL_BLESSING", coin_value, "TikTok")
-			emit_signal("alert_announcement", donor_name + " sent Ice Cream! 🍦", "Wall Boost!", Color(0.3, 0.9, 0.4))
+			emit_signal("alert_announcement", donor_name + " sent Ice Cream!", "Wall Boost!", Color(0.3, 0.9, 0.4))
 		"doughnut":
 			emit_signal("stream_action_received", donor_name, "WATER_BOMB", coin_value, "TikTok")
-			emit_signal("alert_announcement", donor_name + " sent a Doughnut! 🍩", "Water Payload Inbound!", Color(0.1, 0.6, 1.0))
+			emit_signal("alert_announcement", donor_name + " sent a Doughnut!", "Water Payload Inbound!", Color(0.1, 0.6, 1.0))
 		"galaxy":
 			emit_signal("stream_action_received", donor_name, "TSUNAMI", coin_value, "TikTok")
-			emit_signal("alert_announcement", "🌌 GALAXY TSUNAMI! 🌌", donor_name + " flooded the grid!", Color(0.6, 0.2, 1.0))
+			emit_signal("alert_announcement", "GALAXY TSUNAMI!", donor_name + " flooded the grid!", Color(0.6, 0.2, 1.0))
 		"lion", "universe":
 			emit_signal("stream_action_received", donor_name, "VOLCANO_BOMB", coin_value, "TikTok")
-			emit_signal("alert_announcement", "🦁 LION ROAR BLAST! 🦁", donor_name + " cracked the earth!", Color(1.0, 0.6, 0.0))
+			emit_signal("alert_announcement", "LION ROAR BLAST!", donor_name + " cracked the earth!", Color(1.0, 0.6, 0.0))
 		_:
 			emit_signal("stream_action_received", donor_name, "WATER_BOMB", coin_value, "TikTok")
 			emit_signal("alert_announcement", donor_name + " sent " + gift_name, "Incoming Hazard!", Color(0.9, 0.5, 0.2))

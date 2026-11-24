@@ -18,6 +18,11 @@ signal toggle_aspect_ratio_requested()
 @onready var toast_panel: PanelContainer = $RootControl/ToastPanel
 @onready var toast_title: Label = $RootControl/ToastPanel/VBox/ToastTitle
 @onready var toast_subtitle: Label = $RootControl/ToastPanel/VBox/ToastSubtitle
+@onready var btn_ability_1: Button = $RootControl/BottomBar/BtnAbility1
+@onready var btn_ability_2: Button = $RootControl/BottomBar/BtnAbility2
+@onready var btn_ability_3: Button = $RootControl/BottomBar/BtnAbility3
+
+const ABILITY_LABELS: Array[String] = ["[1] Flash Freeze", "[2] Solar Ray", "[3] Seismic Anchor"]
 
 var is_vertical_mode: bool = false
 var toast_timer: float = 0.0
@@ -39,9 +44,10 @@ func update_score(score: int, multiplier: float) -> void:
 	multiplier_label.text = "x" + str(snappedf(multiplier, 0.1)) + " COMBO"
 
 func update_water_stats(active_vol: float, max_vol: float) -> void:
-	water_vol_bar.max_value = max_vol
-	water_vol_bar.value = active_vol
-	water_vol_label.text = str(int(active_vol * 100)) + "L Contained"
+	var safe_max: float = maxf(max_vol, 1.0)
+	water_vol_bar.max_value = safe_max
+	water_vol_bar.value = clampf(active_vol, 0.0, safe_max)
+	water_vol_label.text = str(int(active_vol)) + " L / " + str(int(safe_max)) + " L"
 
 func update_drain_meter(spilled: float, threshold: float) -> void:
 	drain_bar.max_value = threshold
@@ -57,7 +63,19 @@ func update_drain_meter(spilled: float, threshold: float) -> void:
 		drain_bar.modulate = Color(0.2, 0.9, 0.4)
 
 func update_vip(donor: String, amount: int) -> void:
-	vip_label.text = "👑 MVP Gifter: " + donor + " (" + str(amount) + " pts)"
+	vip_label.text = "MVP Gifter: " + donor + " (" + str(amount) + " pts)"
+
+func update_ability_cooldowns(cooldowns: Array[float]) -> void:
+	var buttons: Array[Button] = [btn_ability_1, btn_ability_2, btn_ability_3]
+	for i in range(buttons.size()):
+		var btn: Button = buttons[i]
+		var cd: float = cooldowns[i] if i < cooldowns.size() else 0.0
+		var label: String = ABILITY_LABELS[i]
+		if cd > 0.0:
+			label += "  (" + str(snappedf(cd, 0.1)) + "s)"
+		if btn.text != label:
+			btn.text = label
+		btn.disabled = cd > 0.0
 
 func show_alert(title: String, subtitle: String, color: Color) -> void:
 	toast_title.text = title

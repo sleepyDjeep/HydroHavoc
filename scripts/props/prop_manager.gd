@@ -19,8 +19,10 @@ func setup(p_sim: FluidSim) -> void:
 func spawn_prop(prop_class: FloatingProp.PropClass, donor: String, tier: String, val: int, spawn_pos: Vector3) -> FloatingProp:
 	var prop: FloatingProp = FloatingProp.new()
 	prop.position = spawn_pos
-	add_child(prop)
+	# Configure before the node enters the tree: _ready() builds the visuals, so the
+	# class has to be assigned first or every prop renders as the RUBBER_DUCK default.
 	prop.setup(fluid_sim, prop_class, donor, tier, val)
+	add_child(prop)
 
 	prop.plunged_over_waterfall.connect(_on_prop_plunged)
 	prop.boiled_in_steam.connect(_on_prop_boiled)

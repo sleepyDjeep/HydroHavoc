@@ -21,12 +21,13 @@ anchor_right = 1.0
 offset_left = 24.0
 offset_top = 16.0
 offset_right = -24.0
-offset_bottom = 86.0
+offset_bottom = 92.0
 grow_horizontal = 2
-theme_override_constants/separation = 32
+theme_override_constants/separation = 28
 
 [node name="TitleBox" type="VBoxContainer" parent="RootControl/TopBar"]
 layout_mode = 2
+size_flags_horizontal = 0
 alignment = 1
 
 [node name="Title" type="Label" parent="RootControl/TopBar/TitleBox"]
@@ -41,42 +42,32 @@ theme_override_colors/font_color = Color(0.65, 0.75, 0.85, 0.8)
 theme_override_font_sizes/font_size = 13
 text = "LIVE STREAM ARENA"
 
-[node name="ScoreBox" type="VBoxContainer" parent="RootControl/TopBar"]
-layout_mode = 2
-alignment = 1
-
-[node name="ScoreVal" type="Label" parent="RootControl/TopBar/ScoreBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.9, 0.3, 1)
-theme_override_font_sizes/font_size = 26
-text = "0"
-
-[node name="MultiplierVal" type="Label" parent="RootControl/TopBar/ScoreBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.5, 0.2, 1)
-theme_override_font_sizes/font_size = 13
-text = "x1.0 COMBO"
-
-[node name="StatsBox" type="VBoxContainer" parent="RootControl/TopBar"]
+[node name="Spacer" type="Control" parent="RootControl/TopBar"]
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="StatsBox" type="VBoxContainer" parent="RootControl/TopBar"]
+custom_minimum_size = Vector2(240, 0)
+layout_mode = 2
+size_flags_horizontal = 0
 alignment = 1
 
 [node name="WaterVolLabel" type="Label" parent="RootControl/TopBar/StatsBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.3, 0.85, 1, 1)
 theme_override_font_sizes/font_size = 13
-text = "0L Contained"
+text = "0 L / 1228 L"
 
 [node name="WaterVolBar" type="ProgressBar" parent="RootControl/TopBar/StatsBox"]
-custom_minimum_size = Vector2(0, 14)
+custom_minimum_size = Vector2(240, 16)
 layout_mode = 2
 value = 25.0
 show_percentage = false
 
 [node name="DrainBox" type="VBoxContainer" parent="RootControl/TopBar"]
+custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 0
 alignment = 1
 
 [node name="DrainLabel" type="Label" parent="RootControl/TopBar/DrainBox"]
@@ -86,10 +77,30 @@ theme_override_font_sizes/font_size = 13
 text = "0% Spilled"
 
 [node name="DrainBar" type="ProgressBar" parent="RootControl/TopBar/DrainBox"]
-custom_minimum_size = Vector2(0, 14)
+custom_minimum_size = Vector2(240, 16)
 layout_mode = 2
 value = 10.0
 show_percentage = false
+
+[node name="ScoreBox" type="VBoxContainer" parent="RootControl/TopBar"]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_horizontal = 0
+alignment = 1
+
+[node name="ScoreVal" type="Label" parent="RootControl/TopBar/ScoreBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.3, 1)
+theme_override_font_sizes/font_size = 26
+text = "0"
+horizontal_alignment = 2
+
+[node name="MultiplierVal" type="Label" parent="RootControl/TopBar/ScoreBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.5, 0.2, 1)
+theme_override_font_sizes/font_size = 13
+text = "x1.0 COMBO"
+horizontal_alignment = 2
 
 [node name="VipBanner" type="PanelContainer" parent="RootControl"]
 layout_mode = 1
@@ -106,7 +117,7 @@ grow_horizontal = 0
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
 theme_override_font_sizes/font_size = 14
-text = "👑 MVP Gifter: Waiting for First Bit..."
+text = "MVP Gifter: Waiting for First Gift..."
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -117,7 +128,7 @@ anchor_left = 1.0
 anchor_top = 0.5
 anchor_right = 1.0
 anchor_bottom = 0.5
-offset_left = -120.0
+offset_left = -380.0
 offset_top = -140.0
 offset_right = -20.0
 offset_bottom = 220.0

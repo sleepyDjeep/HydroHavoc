@@ -37,13 +37,30 @@ func _ready() -> void:
 	_build_nameplate()
 
 func setup(p_sim: FluidSim, p_class: PropClass, p_donor: String, p_tier: String, p_val: int) -> void:
+	var class_changed: bool = p_class != prop_class
 	fluid_sim = p_sim
 	prop_class = p_class
 	donor_name = p_donor
 	gift_tier = p_tier
 	gift_value = p_val
+
 	if nameplate_label:
-		nameplate_label.text = "👑 " + donor_name + "\n[" + gift_tier + "]"
+		nameplate_label.text = _format_nameplate()
+		nameplate_label.modulate = _get_tier_color()
+
+	# setup() may arrive after the node is already in the tree, in which case _ready()
+	# already built visuals for the default class. Rebuild them for the real one.
+	if class_changed and is_inside_tree():
+		_rebuild_visuals()
+
+func _format_nameplate() -> String:
+	return "VIP " + donor_name + "\n[" + gift_tier + "]"
+
+func _rebuild_visuals() -> void:
+	if is_instance_valid(visual_mesh):
+		visual_mesh.queue_free()
+	visual_mesh = null
+	_build_visuals()
 
 func _process(delta: float) -> void:
 	if not fluid_sim or has_plunged:
@@ -150,7 +167,7 @@ func _build_nameplate() -> void:
 	nameplate_label.outline_size = 6
 	nameplate_label.outline_modulate = Color(0.05, 0.05, 0.1, 0.95)
 	nameplate_label.position = Vector3(0, 1.1, 0)
-	nameplate_label.text = "👑 " + donor_name + "\n[" + gift_tier + "]"
+	nameplate_label.text = _format_nameplate()
 	nameplate_label.modulate = _get_tier_color()
 	add_child(nameplate_label)
 

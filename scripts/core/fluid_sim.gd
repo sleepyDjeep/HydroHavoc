@@ -27,6 +27,10 @@ var total_spilled_water: float = 0.0
 var spill_rate: float = 0.0
 var active_water_volume: float = 0.0
 
+# Monotonic counter bumped whenever terrain or water changes. Consumers that derive
+# geometry from the field (the water mesh) use it to skip redundant rebuilds.
+var water_revision: int = 0
+
 func _init() -> void:
 	terrain.resize(CELL_COUNT)
 	water.resize(CELL_COUNT)
@@ -40,6 +44,7 @@ func reset() -> void:
 	total_spilled_water = 0.0
 	spill_rate = 0.0
 	active_water_volume = 0.0
+	water_revision += 1
 	for i in range(CELL_COUNT):
 		terrain[i] = 0.0
 		water[i] = 0.0
@@ -62,11 +67,13 @@ func get_terrain(x: int, y: int) -> float:
 func set_terrain(x: int, y: int, height: float) -> void:
 	if is_in_bounds(x, y):
 		terrain[get_index(x, y)] = maxf(0.0, height)
+		water_revision += 1
 
 func add_terrain(x: int, y: int, delta: float) -> void:
 	if is_in_bounds(x, y):
 		var idx: int = get_index(x, y)
 		terrain[idx] = clampf(terrain[idx] + delta, 0.0, 15.0)
+		water_revision += 1
 
 func get_water(x: int, y: int) -> float:
 	if not is_in_bounds(x, y):
@@ -77,6 +84,7 @@ func add_water(x: int, y: int, volume: float) -> void:
 	if is_in_bounds(x, y):
 		var idx: int = get_index(x, y)
 		water[idx] = maxf(0.0, water[idx] + volume)
+		water_revision += 1
 
 func evaporate_at(center_x: int, center_y: int, radius: int, max_evap: float) -> float:
 	var total_evaporated: float = 0.0
@@ -93,6 +101,8 @@ func evaporate_at(center_x: int, center_y: int, radius: int, max_evap: float) ->
 						var removed: float = minf(w, max_evap)
 						water[idx] -= removed
 						total_evaporated += removed
+	if total_evaporated > 0.0:
+		water_revision += 1
 	return total_evaporated
 
 func get_water_height_at_world_pos(world_x: float, world_z: float) -> float:
@@ -143,6 +153,7 @@ func step(dt: float) -> void:
 	dt = minf(dt, 0.033) # Clamp physics sub-step
 	var current_step_spill: float = 0.0
 	var current_active_vol: float = 0.0
+	var field_motion: float = 0.0
 
 	# Step 1: Outflow flux computation for each cell
 	for y in range(GRID_SIZE):
@@ -230,7 +241,13 @@ func step(dt: float) -> void:
 			var new_w: float = water[idx] + dt * (sum_in - sum_out)
 			water[idx] = maxf(0.0, new_w)
 			current_active_vol += water[idx]
+			field_motion += absf(sum_in - sum_out)
 
 	total_spilled_water += current_step_spill
 	spill_rate = current_step_spill / dt
 	active_water_volume = current_active_vol
+
+	# A settled mixture nets to zero per-cell change, so the surface mesh can keep its
+	# previous geometry. Only a field that actually moved invalidates it.
+	if field_motion > 0.0005:
+		water_revision += 1
