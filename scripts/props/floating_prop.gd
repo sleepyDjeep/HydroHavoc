@@ -70,6 +70,11 @@ var life_time: float = 0.0
 var visual_mesh: Node3D
 var nameplate_label: Label3D
 var visual_top: float = 0.0 # local height of the fitted geometry, used by the nameplate
+## World-space lift applied by PropManager when another plate would overlap this one.
+var nameplate_lift: float = 0.0
+
+## Gap between the fitted geometry's top and the plate, in metres.
+const PLATE_ABOVE_PROP: float = 0.55
 
 func _ready() -> void:
 	rocking_seed = randf() * 100.0
@@ -94,8 +99,11 @@ func setup(p_sim: FluidSim, p_class: PropClass, p_donor: String, p_tier: String,
 	if class_changed and is_inside_tree():
 		_rebuild_visuals()
 
+## One line only. The old "[Rose]" second line doubled the plate's height for information
+## the colour already carries (a gift's tier is fixed per prop class), and it was the line
+## that covered the neighbouring prop when two gifts drifted together.
 func _format_nameplate() -> String:
-	return "VIP " + donor_name + "\n[" + gift_tier + "]"
+	return "VIP " + donor_name
 
 func _rebuild_visuals() -> void:
 	if is_instance_valid(visual_mesh):
@@ -210,9 +218,9 @@ func _build_nameplate() -> void:
 	# prop's wave rocking, which slid the text sideways off the thing it labels.
 	nameplate_label.top_level = true
 	nameplate_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	# A 48 px font at this pixel size is ~0.46 m per line in world space: around 23 px
-	# tall at 720p from the default camera, which stays legible where the old 0.12 m
-	# text did not. Depth testing is off so the plate reads over its own prop and water.
+	# A 48 px font at this pixel size is ~0.46 m tall in world space: around 23 px at 720p
+	# from the default camera, which stays legible where the old 0.12 m text did not.
+	# Depth testing is off so the plate reads over its own prop and water.
 	nameplate_label.font_size = 48
 	nameplate_label.pixel_size = 0.0095
 	nameplate_label.outline_size = 12
@@ -233,20 +241,35 @@ func _refresh_nameplate() -> void:
 ## inherit the prop's rocking rotation (which used to slide it sideways off the prop).
 func _track_nameplate() -> void:
 	if nameplate_label and is_inside_tree():
-		nameplate_label.position = global_position + Vector3(0.0, visual_top + 0.55, 0.0)
+		nameplate_label.position = nameplate_anchor_world() + Vector3(0.0, nameplate_lift, 0.0)
 
+## Where the plate sits above this prop before any stagger is applied, in world space.
+func nameplate_anchor_world() -> Vector3:
+	return global_position + Vector3(0.0, visual_top + PLATE_ABOVE_PROP, 0.0)
+
+## Footprint of the plate in metres, measured from the font rather than from the node's
+## AABB: Label3D reports its box in font pixels, which made the collision test ~7x too big
+## and lifted plates the height of the prop. The 1.15 covers line spacing.
+func nameplate_size_world() -> Vector2:
+	if not nameplate_label:
+		return Vector2.ZERO
+	var font: Font = nameplate_label.font if nameplate_label.font else ThemeDB.fallback_font
+	var px: Vector2 = font.get_string_size(nameplate_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+		nameplate_label.font_size)
+	return px * nameplate_label.pixel_size * Vector2(1.0, 1.15)
+
+## The plate colour carries the gift tier now that the "[Rose]" line is gone, using the
+## same colours the alert banner uses for that gift.
 func _get_tier_color() -> Color:
-	match prop_class:
-		PropClass.RUBBER_DUCK:
-			return Color(1.0, 0.9, 0.2)
-		PropClass.GIFT_CRATE:
-			return Color(0.4, 0.9, 1.0)
-		PropClass.HEAVY_ANCHOR:
-			return Color(1.0, 0.3, 0.4)
-		PropClass.STREAMER_MASCOT:
-			return Color(0.9, 0.4, 1.0)
+	match gift_tier.to_lower():
+		"rose":
+			return Color(1.0, 0.4, 0.6)
+		"galaxy":
+			return Color(0.6, 0.2, 1.0)
+		"lion", "universe":
+			return Color(1.0, 0.6, 0.0)
 		_:
-			return Color.WHITE
+			return Color(0.85, 0.9, 1.0)
 
 func _build_visuals() -> void:
 	match prop_class:

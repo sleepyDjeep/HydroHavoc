@@ -7,11 +7,76 @@ extends Node3D
 signal prop_vaporized_in_steam(prop_name: String, donor: String, bonus_pts: int)
 signal prop_plunged(prop_name: String, donor: String)
 
+## A sixteen-character plate is roughly 200 px wide at 720p while the prop it labels is
+## about 60 px, so two props that drift close put their text on top of each other. This
+## pass stacks a plate a line at a time until it clears the plates already placed this
+## frame, left to right.
+const PLATE_STACK_LIMIT: int = 3
+const PLATE_GAP_PX: float = 4.0
+
 var fluid_sim: FluidSim
 var active_props: Array[FloatingProp] = []
 
 func _ready() -> void:
 	pass
+
+func _process(_delta: float) -> void:
+	_stagger_nameplates()
+
+## Screen-space layout, because whether two plates collide depends on the camera, not on
+## the world distance between the props (the view is shallow, so depth compresses).
+func _stagger_nameplates() -> void:
+	if active_props.is_empty():
+		return
+	for prop in active_props:
+		if is_instance_valid(prop):
+			prop.nameplate_lift = 0.0
+	if active_props.size() < 2:
+		return
+
+	var cam: Camera3D = get_viewport().get_camera_3d()
+	if cam == null:
+		return
+
+	var items: Array = []
+	for prop in active_props:
+		if not is_instance_valid(prop) or prop.has_plunged or not prop.nameplate_label:
+			continue
+		var anchor: Vector3 = prop.nameplate_anchor_world()
+		var plate: Vector2 = prop.nameplate_size_world()
+		var centre: Vector2 = cam.unproject_position(anchor)
+		var right: Vector3 = cam.global_transform.basis.x * maxf(plate.x, 0.1) * 0.5
+		var width_px: float = cam.unproject_position(anchor - right).distance_to(
+			cam.unproject_position(anchor + right))
+		var px_per_m: float = maxf(centre.distance_to(cam.unproject_position(anchor + Vector3.UP)), 0.001)
+		items.append({
+			"prop": prop,
+			"centre": centre,
+			"size": Vector2(width_px, maxf(plate.y, 0.1) * px_per_m),
+			"px_per_m": px_per_m,
+		})
+	items.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["centre"].x < b["centre"].x)
+
+	var placed: Array[Rect2] = []
+	for item in items:
+		var centre: Vector2 = item["centre"]
+		var size: Vector2 = item["size"]
+		var top_left: Vector2 = centre - size * 0.5
+		var candidate: Rect2 = Rect2(top_left, size)
+		# Move straight above whichever plate conflicts rather than stepping by a fixed
+		# amount: two plates rarely sit at the same height, and a fixed step left a few
+		# pixels of overlap that cost another level (and a plate floating off its prop).
+		for _pass in range(PLATE_STACK_LIMIT + 1):
+			var moved: bool = false
+			for taken in placed:
+				if candidate.intersects(taken):
+					candidate.position.y = taken.position.y - candidate.size.y - PLATE_GAP_PX
+					moved = true
+			if not moved:
+				break
+		placed.append(candidate)
+		# Convert the chosen lift back to world units for the 3D label.
+		item["prop"].nameplate_lift = maxf(0.0, top_left.y - candidate.position.y) / item["px_per_m"]
 
 func setup(p_sim: FluidSim) -> void:
 	fluid_sim = p_sim
