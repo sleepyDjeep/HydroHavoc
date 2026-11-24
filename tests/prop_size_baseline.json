@@ -1,0 +1,37 @@
+{
+	"props": {
+		"Gift Crate": {
+			"px_h": 59.2,
+			"px_w": 36.2,
+			"scale": 1.66666662693024,
+			"target": 1.35,
+			"visual_top": 1.01250005334616
+		},
+		"Heavy Anchor": {
+			"px_h": 133.5,
+			"px_w": 85.8,
+			"scale": 2.57425737380981,
+			"target": 2.6,
+			"visual_top": 2.28799993223814
+		},
+		"Rubber Duck": {
+			"px_h": 74.5,
+			"px_w": 45.7,
+			"scale": 2.29729723930359,
+			"target": 1.7,
+			"visual_top": 1.18999998529537
+		},
+		"Streamer Mascot": {
+			"px_h": 110.1,
+			"px_w": 70.7,
+			"scale": 1.45000004768372,
+			"target": 2.2,
+			"visual_top": 1.54
+		}
+	},
+	"tolerance": {
+		"px": 1.5,
+		"scale": 0.005
+	},
+	"view": "1280x720 projection of the fitted geometry, headless"
+}

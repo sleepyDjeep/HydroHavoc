@@ -81,3 +81,13 @@ if ! "$GODOT" --headless --path "$ROOT" --script "res://tests/name_policy_test.g
 fi
 
 echo "OK: donor name policy holds."
+
+echo "== prop sizes =="
+# Headless, so a sizing regression fails here rather than waiting for someone to run the
+# windowed silhouette harness in tests/measure_props.gd.
+if ! "$GODOT" --headless --path "$ROOT" --script "res://tests/prop_size.gd"; then
+	echo "FAIL: prop sizes moved away from the baseline." >&2
+	exit 1
+fi
+
+echo "OK: prop sizes match the baseline."

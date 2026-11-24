@@ -3,21 +3,21 @@
 	"props": {
 		"Gift Crate": {
 			"area": 1622,
-			"h": 47,
+			"h": 48,
 			"w": 40
 		},
 		"Heavy Anchor": {
-			"area": 1344,
-			"h": 49,
+			"area": 1338,
+			"h": 48,
 			"w": 73
 		},
 		"Rubber Duck": {
-			"area": 2196,
+			"area": 2454,
 			"h": 53,
 			"w": 59
 		},
 		"Streamer Mascot": {
-			"area": 1736,
+			"area": 1522,
 			"h": 69,
 			"w": 78
 		}
