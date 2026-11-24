@@ -1,0 +1,30 @@
+{
+	"nameplate_line_px": 26,
+	"props": {
+		"Gift Crate": {
+			"area": 1622,
+			"h": 47,
+			"w": 40
+		},
+		"Heavy Anchor": {
+			"area": 1344,
+			"h": 49,
+			"w": 73
+		},
+		"Rubber Duck": {
+			"area": 2196,
+			"h": 53,
+			"w": 59
+		},
+		"Streamer Mascot": {
+			"area": 1736,
+			"h": 69,
+			"w": 78
+		}
+	},
+	"tolerance": {
+		"area_percent": 8.0,
+		"size_px": 2
+	},
+	"view": "1280x720, default camera, 16:9"
+}

@@ -52,7 +52,7 @@ while IFS= read -r file; do
 		"$GODOT" --headless --path "$ROOT" --check-only --script "res://$rel" 2>&1 | sed 's/^/    /'
 		failed=$((failed + 1))
 	fi
-done < <(find "$ROOT/scripts" "$ROOT/tests" -name '*.gd' | sort)
+done < <(find "$ROOT/scripts" "$ROOT/tests" "$ROOT/tools" -name '*.gd' | sort)
 
 if [ "$total" -eq 0 ]; then
 	echo "FAIL: no scripts found under $ROOT/scripts." >&2
