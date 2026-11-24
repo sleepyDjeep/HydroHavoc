@@ -5,7 +5,11 @@
 .DS_Store
 Thumbs.db
 
-# Large uncompressed executables (exceeds GitHub 100MB per-file limit)
-# The compressed .zip distribution archives in build/ are kept
-build/windows/*.exe
-build/windows/*.console.exe
+# Export output (regenerated locally; GitHub Pages serves the docs/ copy instead)
+build/
+
+# Godot import sidecars for exported builds, regenerated on every local import
+docs/*.import
+
+# Local verification artifacts
+.verify/

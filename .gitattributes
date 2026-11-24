@@ -1,0 +1,9 @@
+# Shell scripts and Godot text resources must stay LF so tools/check.sh works
+# identically on Windows and in Linux CI.
+*.sh        text eol=lf
+*.gd        text eol=lf
+*.tscn      text eol=lf
+*.tres      text eol=lf
+*.gdshader  text eol=lf
+*.cfg       text eol=lf
+*.yml       text eol=lf

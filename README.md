@@ -1,58 +1,97 @@
-# HydroHavoc 🌊🎮
+# HydroHavoc
 
-> A modern, fast-paced streaming puzzle game inspired by the N64 classic *Wetrix*, built from the ground up for live audience interaction, crowd disasters, and streamer engagement on Twitch, TikTok Live, Kick, and YouTube.
+A 2.5D water-puzzle game in the spirit of *Wetrix*, built in Godot 4.7 with a streamer audience in mind: viewers drop water and props into the arena you are trying to keep above sea level.
 
-![HydroHavoc Gameplay](screenshot_props_slice.png)
+**Status: prototype.** The simulation, placement rules, scoring on evaporation, four floating prop classes and a mock audience-event dock are in place. There is no round structure, no win/lose condition, and no live platform connection yet. See [What works](#what-works) and [What is not built yet](#what-is-not-built-yet) before assuming any feature exists.
 
----
+![HydroHavoc, early build capture with procedural placeholder art](screenshot_props_slice.png)
 
-## 🌟 Features
-
-- **2.5D Shallow Water Equations (SWE) Physics**: Real-time fluid mass-conservation simulation running on a $32 \times 32$ heightfield grid at $<3\%$ CPU overhead.
-- **Classic Polyomino Arcade Mechanics**: Rotating and slamming Uppers (walls), Downers (trenches), Water Drops (downpours), Fireballs (steam evaporation), Bombs (craters), and Sponges.
-- **Dual-Mode Streaming Layouts**:
-  - **16:9 Widescreen**: Tailored for Twitch, YouTube, and Kick.
-  - **9:16 Vertical Portrait**: Optimized for TikTok Live Studio mobile streams (press `T` to toggle).
-- **Interactive 3D Floating Props & Single-Point Buoyancy**:
-  - 🐥 **Rubber Ducks**: Bobs and drifts with surface flow; awards bonus points when boiled in steam!
-  - 📦 **Viewer Gift Crates**: Branded wooden crates displaying the donor's username and gift tier.
-  - ⚓ **Heavy Sinking Anchors**: High-mass boulders that create impact waves and divert fluid currents.
-  - 🏃 **Streamer Mascot**: 3D character ragdoll that reacts physically to incoming tsunamis and edge spills.
-- **Audience Action Ingestion**:
-  - Integrated mock stream test dock for Bits (100, 500, 1000) and TikTok Gifts (Rose, Doughnut, Galaxy, Lion).
-  - On-screen VIP Gifter Throne, dynamic alert banners, and fail-state Earthquake collapses.
+*The screenshot is from the first playable build; art is procedural placeholder geometry.*
 
 ---
 
-## 🕹️ Controls
+## What works
 
-| Action | Key / Input |
+- **Water simulation** — a 32x32 heightfield stepped at a fixed 30 Hz with explicit flux advection (`scripts/core/fluid_sim.gd`). Water flows downhill, drains over the arena rim, and total spilled volume is accumulated separately from what is still on the field.
+- **Placement** — a rotating polyomino queue with six piece kinds: wall (upper), trench (downer), water drop, fireball, bomb and sponge (`scripts/core/piece_manager.gd`). 11 shape templates, 4 pieces visible in the queue.
+- **Abilities on `1` / `2` / `3`** — Flash Freeze (10 s cooldown), Solar Ray (4 s), Seismic Anchor (12 s). Each is gated by its own cooldown and the HUD buttons show the remaining seconds and disable themselves (`scripts/core/game_manager.gd`, `scripts/ui/game_hud.gd`).
+- **Scoring** — only evaporation scores. Boiling standing water with a fireball, Solar Ray or sponge raises a multiplier; the multiplier decays back to 1x after 5 s without a boil.
+- **Spill pressure** — spilled volume fills the drain meter against a 35 L earthquake threshold. Crossing it shatters random wall cells, shakes the camera and resets the meter. It does not end the run.
+- **Floating props** — four classes with distinct geometry: rubber duck, gift crate (`assets/models/props/gift_crate.glb`), heavy anchor and streamer mascot (`assets/models/characters/streamer_mascot.glb`). They are buoyant, drift with surface flow, tilt with the wave field, boil away for bonus points inside a steam radius and plunge if they reach the rim.
+- **Mock audience dock** — HUD buttons inject Bits (100/500/1000) and TikTok gifts (Rose, Galaxy, Lion); `Tab` injects a random 100-Bit event. These call `StreamEventManager.simulate_*` directly. Nothing is read from a network socket yet.
+- **Two camera/HUD arrangements** — `T` swaps the HUD into its portrait arrangement and pulls the camera back with a wider field of view (16:9 ↔ 9:16 framing).
+
+## What is not built yet
+
+- **No run loop.** There are no waves, rounds, timers, budget, or game over. The economy described in the product plan (rising water per wave, enclose → clear → score) does not exist.
+- **No real platform integration.** No Twitch EventSub, TikTok Live, Kick or YouTube connection. `StreamEventManager` only holds mock helpers; a bridge process is planned but not started.
+- **No menu, pause, settings, audio, or save.** One hand-built starting map.
+- **Web export is untested.** The presets exist (`export_presets.cfg`), but the exported build in `docs/` has not been verified in a browser by this project.
+- **Placeholder art throughout.** Procedural meshes and shaders; the gift crate has no texture; splash rings are opaque white torus meshes and the steam puff is an oversized sphere.
+- **Known visual defects.** Water edges and foam read badly at the default camera; props are small and their nameplates are hard to read without zooming.
+- **Performance is unmeasured.** No frame-time or CPU budget has been recorded for either target.
+
+## Controls
+
+| Action | Input |
 | :--- | :--- |
-| **Move Cursor** | `W`, `A`, `S`, `D` or Arrow Keys |
-| **Rotate Piece** | `R` or `E` |
-| **Slam / Drop Piece** | `Space` or `Enter` |
-| **Toggle 16:9 / 9:16 Mode** | `T` or HUD Button |
-| **Emergency Ability 1** | `1` (Flash Freeze - 6s liquid stasis) |
-| **Emergency Ability 2** | `2` (Solar Ray - lake vaporization) |
-| **Emergency Ability 3** | `3` (Seismic Anchor - dam reinforcement) |
+| Move placement cursor | `W` `A` `S` `D` or arrow keys |
+| Rotate piece | `R` or `E` |
+| Drop piece | `Space` or `Enter` |
+| Toggle 16:9 / 9:16 framing | `T` or the HUD button |
+| Ability 1 — Flash Freeze (10 s) | `1` |
+| Ability 2 — Solar Ray (4 s) | `2` |
+| Ability 3 — Seismic Anchor (12 s) | `3` |
+| Inject a test donation | `Tab` (debug shortcut, see the mock dock in the HUD) |
 
----
+## Running it
 
-## 📦 Playable Builds
+1. Install Godot 4.7.x with the Forward+ renderer (the project was last booted on 4.7.2).
+2. Open `project.godot` in the editor once so resources are imported, or run the import step below.
+3. Run the project (`F5`), or from a shell:
 
-- **Windows Standalone (.exe)**: Located in [`build/windows/`](build/windows/) or download the packaged [`HydroHavoc-Windows-x64.zip`](build/windows/HydroHavoc-Windows-x64.zip) (37 MB).
-- **Web Demo (HTML5 / WebAssembly)**: Located in [`build/web/index.html`](build/web/) or unpack [`HydroHavoc-Web-Demo.zip`](build/web/HydroHavoc-Web-Demo.zip) to play in any modern browser.
+```bash
+godot --path .
+```
 
----
+### Checking the scripts
 
-## 🛠️ Development & Engine
+`tools/check.sh` imports the project and parses every script in `scripts/` with a real Godot binary, so a syntax or type error fails loudly instead of surfacing at runtime:
 
-- **Engine**: Godot 4.7.2 (Forward+ / Mobile / Web)
-- **Language**: Typed GDScript + GLSL Spatial Shaders
-- **Architecture**:
-  - `scripts/core/fluid_sim.gd`: 2.5D Shallow Water Equations & flux advection.
-  - `scripts/core/terrain_mesh_builder.gd`: Dynamic procedural terrain mesh.
-  - `scripts/core/water_mesh_builder.gd`: Dynamic fluid surface mesh.
-  - `scripts/core/piece_manager.gd`: Polyomino queue and rotation state.
-  - `scripts/props/prop_manager.gd`: 3D floating props & hydrodynamic surface clamping.
-  - `scripts/ui/game_hud.gd`: Responsive dual-aspect ratio UI.
+```bash
+GODOT=/path/to/godot ./tools/check.sh
+```
+
+## Project layout
+
+```
+scenes/main.tscn              Arena, camera rig, prop manager, HUD
+scenes/ui/hud.tscn            Top bar, score, queue, ability buttons, mock dock
+scripts/core/fluid_sim.gd     Heightfield water: flux advection, spill accounting, revision counter
+scripts/core/game_manager.gd  Input, placement, scoring, abilities, hazards, quake
+scripts/core/piece_manager.gd Piece templates, weighted queue, rotation
+scripts/core/stream_event_manager.gd  Mock audience event hub (no network)
+scripts/core/terrain_mesh_builder.gd  Terrain surface mesh
+scripts/core/water_mesh_builder.gd    Water surface mesh
+scripts/props/prop_manager.gd Spawning, splash waves, steam vaporisation
+scripts/props/floating_prop.gd Buoyancy, drift, tilt, nameplate
+scripts/ui/game_hud.gd        Meter/queue/cooldown updates, alerts
+assets/shaders/               Terrain and water shaders
+docs/                         GitHub Pages copy of the web export
+tools/check.sh                Import + parse check used locally and in CI
+```
+
+## Verification status
+
+Last checked on 2026-11-24 with Godot 4.7.2:
+
+- `--headless --import` completed and all 9 scripts passed `--check-only`.
+- A scripted windowed boot of `scenes/main.tscn` ran 37 assertions with 0 failures: all four prop classes spawned with distinct geometry, the top-bar meters were measured clear of the score box, abilities `1`/`2`/`3` bound to the expected keycodes and applied their cooldowns, and no non-ASCII text was left in runtime strings.
+
+Not verified: performance, the web export, the 9:16 layout on a portrait canvas, and any real platform API.
+
+## Repo notes
+
+- Build output is not tracked. `export_presets.cfg` exports to `build/`, which is gitignored; `docs/` keeps one exported web build because GitHub Pages serves it.
+- CI (`.github/workflows/ci.yml`) pins Godot 4.7.2 and runs `tools/check.sh`. Bump `GODOT_VERSION` in the workflow when the engine is upgraded. The workflow has not been run yet.
+- Licence: MIT, see [LICENSE](LICENSE). Changes are listed in [CHANGELOG.md](CHANGELOG.md).
