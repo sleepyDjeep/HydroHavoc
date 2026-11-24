@@ -70,8 +70,10 @@ var life_time: float = 0.0
 var visual_mesh: Node3D
 var nameplate_label: Label3D
 var visual_top: float = 0.0 # local height of the fitted geometry, used by the nameplate
-## World-space lift applied by PropManager when another plate would overlap this one.
+## World-space lift applied by PropManager when another plate or prop would overlap this
+## one, and the shrink factor used when lifting alone would carry the plate too far away.
 var nameplate_lift: float = 0.0
+var nameplate_scale: float = 1.0
 
 ## Gap between the fitted geometry's top and the plate, in metres.
 const PLATE_ABOVE_PROP: float = 0.55
@@ -242,6 +244,21 @@ func _refresh_nameplate() -> void:
 func _track_nameplate() -> void:
 	if nameplate_label and is_inside_tree():
 		nameplate_label.position = nameplate_anchor_world() + Vector3(0.0, nameplate_lift, 0.0)
+		nameplate_label.scale = Vector3.ONE * nameplate_scale
+
+## Box the fitted geometry occupies in world space, used by the plate layout to keep text
+## off the neighbouring prop. Width is approximated from the class height because the
+## meshes are roughly as wide as they are tall and the skinned mascot's own bounds are
+## unusable.
+## The footprint is deliberately tighter than a full bounding cube (0.6 x height in both
+## width and depth): the camera looks down at the arena, so an honest cube projects its top
+## face as well and covers far more screen than the prop does, which made the plate layout
+## dodge a region twice the prop's size.
+func visual_box_world() -> AABB:
+	var height: float = TARGET_VISUAL_HEIGHT[prop_class]
+	var side: float = height * 0.6
+	return AABB(global_position + Vector3(-side * 0.5, visual_top - height, -side * 0.5),
+		Vector3(side, height, side))
 
 ## Where the plate sits above this prop before any stagger is applied, in world space.
 func nameplate_anchor_world() -> Vector3:

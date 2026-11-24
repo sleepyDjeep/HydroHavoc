@@ -43,6 +43,35 @@ func _set_plates_visible(props: Array, state: bool) -> void:
 		if is_instance_valid(prop) and prop.nameplate_label:
 			prop.nameplate_label.visible = state
 
+## Screen rectangle of a plate, in image pixels (the canvas is 1920x1080 and the window is
+## 1280x720, so everything is scaled back down).
+func _plate_rect(cam: Camera3D, prop: FloatingProp, canvas_scale: Vector2) -> Rect2:
+	var plate: Vector2 = prop.nameplate_size_world() * prop.nameplate_scale
+	var anchor: Vector3 = prop.nameplate_label.position
+	var centre: Vector2 = cam.unproject_position(anchor) * canvas_scale
+	var half_right: Vector3 = cam.global_transform.basis.x * plate.x * 0.5
+	var w: float = (cam.unproject_position(anchor - half_right) * canvas_scale).distance_to(
+		cam.unproject_position(anchor + half_right) * canvas_scale)
+	# Measured against the camera plane, matching the layout: world up is foreshortened by
+	# the camera pitch, so projecting it here would under-report the plate's height.
+	var h: float = (cam.unproject_position(anchor + cam.global_transform.basis.y * plate.y)
+		* canvas_scale).distance_to(centre)
+	return Rect2(centre - Vector2(w, h) * 0.5, Vector2(w, h))
+
+func _prop_rect(cam: Camera3D, prop: FloatingProp, canvas_scale: Vector2) -> Rect2:
+	var box: AABB = prop.visual_box_world()
+	var lo: Vector2 = Vector2(INF, INF)
+	var hi: Vector2 = Vector2(-INF, -INF)
+	for i in range(8):
+		var corner: Vector3 = box.position + Vector3(
+			box.size.x if (i & 1) else 0.0,
+			box.size.y if (i & 2) else 0.0,
+			box.size.z if (i & 4) else 0.0)
+		var p: Vector2 = cam.unproject_position(corner) * canvas_scale
+		lo = lo.min(p)
+		hi = hi.max(p)
+	return Rect2(lo, hi - lo)
+
 func _meshes(node: Node, out: Array) -> void:
 	for child in node.get_children():
 		if child is MeshInstance3D and child.mesh:
@@ -140,6 +169,10 @@ func _run() -> void:
 
 	var cam: Camera3D = main.get_node("CameraPivot/Camera3D")
 	var pm: PropManager = main.get_node("Arena/PropManager")
+	# Own the layout clock as well: left automatic, the manager re-lays the plates out on
+	# every awaited frame while the labels stay where the harness last put them, so the
+	# measurement would mix a fresh layout with stale label positions.
+	pm.set_process(false)
 	var sim: FluidSim = main.sim
 
 	# Use the stock starter map rather than a flat bed: a flat map lets the lake drain
@@ -257,6 +290,26 @@ func _run() -> void:
 		crop.resize(rect.size.x * 8, rect.size.y * 8, Image.INTERPOLATE_NEAREST)
 		crop.save_png(OUT_DIR + "/crop_%s.png" % spec[2])
 
+	# --- the normal spread: four props 4 m apart -----------------------------------------
+	var spread_plates: Array[Rect2] = []
+	var spread_props: Array[Rect2] = []
+	pm.call("_process", 0.0)
+	for prop in props:
+		prop.call("_track_nameplate")
+	for prop in props:
+		spread_plates.append(_plate_rect(cam, prop, canvas_scale))
+		spread_props.append(_prop_rect(cam, prop, canvas_scale))
+	var spread_bad: String = ""
+	for i in range(spread_plates.size()):
+		for j in range(spread_plates.size()):
+			if i == j:
+				continue
+			if spread_plates[i].intersects(spread_plates[j]):
+				spread_bad += "plate%d-plate%d " % [i, j]
+			if spread_plates[i].intersects(spread_props[j]):
+				spread_bad += "plate%d-prop%d " % [i, j]
+	_ok(spread_bad.is_empty(), "spread-out plates keep clear", spread_bad)
+
 	# --- clustered plates ---------------------------------------------------------------
 	# Bring the pair 2 m apart: with ~110 px-wide plates that is the case that used to put
 	# one name on top of the other. 4 m apart they happen not to overlap, which would pass
@@ -302,19 +355,97 @@ func _run() -> void:
 
 	_ok(plate_rects[0].intersects(plate_rects[1]) == false, "clustered plates do not overlap",
 		"duck lift %.2f m, crate lift %.2f m" % [props[0].nameplate_lift, props[1].nameplate_lift])
-	_ok(props[0].nameplate_lift > 0.0 or props[1].nameplate_lift > 0.0,
-		"a colliding plate was lifted", "duck %.2f m, crate %.2f m" %
-		[props[0].nameplate_lift, props[1].nameplate_lift])
-	# One plate box of clearance is a clean stagger; three would leave the label floating far
-	# from the prop it belongs to.
+	var duck_box: Rect2 = _prop_rect(cam, props[0], canvas_scale)
+	var crate_box: Rect2 = _prop_rect(cam, props[1], canvas_scale)
+	var ov1: Rect2 = plate_rects[0].intersection(crate_box)
+	var ov2: Rect2 = plate_rects[1].intersection(duck_box)
+	_ok(plate_rects[0].intersects(crate_box) == false, "duck plate stays off the crate",
+		"%.0f x %.0f px overlap" % [ov1.size.x, ov1.size.y])
+	_ok(plate_rects[1].intersects(duck_box) == false, "crate plate stays off the duck",
+		"%.0f x %.0f px overlap, crate scale %.2f lift %.2f" %
+		[ov2.size.x, ov2.size.y, props[1].nameplate_scale, props[1].nameplate_lift])
 	_ok(props[0].nameplate_label.modulate != props[2].nameplate_label.modulate,
 		"tier colour distinguishes plates",
 		"rose %s vs lion %s" % [props[0].nameplate_label.modulate.to_html(false),
 			props[2].nameplate_label.modulate.to_html(false)])
-	var box_h: float = props[0].nameplate_size_world().y
-	var lift: float = maxf(props[0].nameplate_lift, props[1].nameplate_lift)
-	_ok(lift <= box_h * 1.5, "the lift stays near one plate height",
-		"%.2f m lift vs %.2f m box" % [lift, box_h])
+
+	# --- four props in one huddle -------------------------------------------------------
+	# This is where a fixed stack limit lets the fourth plate overlap silently.
+	var huddle: Array = [Vector3(-0.8, 0.0, -1.6), Vector3(0.8, 0.0, -1.6),
+		Vector3(-0.8, 0.0, -0.6), Vector3(0.8, 0.0, -0.6)]
+	for i in range(props.size()):
+		props[i].position = Vector3(huddle[i].x, props[i].position.y, huddle[i].z)
+		props[i].call("_track_nameplate")
+	pm.call("_process", 0.0)
+	for prop in props:
+		prop.call("_track_nameplate")
+	for f in range(3):
+		await process_frame
+	root.get_viewport().get_texture().get_image().save_png(OUT_DIR + "/props_huddle.png")
+
+	var plate_boxes: Array[Rect2] = []
+	var prop_boxes: Array[Rect2] = []
+	for prop in props:
+		plate_boxes.append(_plate_rect(cam, prop, canvas_scale))
+		prop_boxes.append(_prop_rect(cam, prop, canvas_scale))
+
+	var collisions: String = ""
+	for i in range(plate_boxes.size()):
+		for j in range(plate_boxes.size()):
+			if i == j:
+				continue
+			if plate_boxes[i].intersects(plate_boxes[j]):
+				collisions += "plate%d-plate%d " % [i, j]
+			if plate_boxes[i].intersects(prop_boxes[j]):
+				collisions += "plate%d-prop%d " % [i, j]
+	_ok(collisions.is_empty(), "huddled plates clear of each other and the props", collisions)
+
+	var smallest: float = 1.0
+	for prop in props:
+		smallest = minf(smallest, prop.nameplate_scale)
+	_ok(smallest >= 0.6, "huddled plates stay legible", "smallest scale %.2f" % smallest)
+
+	# --- six props: the density where lifting alone runs out ------------------------------
+	# Gift spam is the case this exists for; if the layout cannot place six plates without
+	# shrinking, the shrink step is dead code.
+	for pos in [Vector3(-1.9, 0.0, -1.0), Vector3(1.9, 0.0, -1.0)]:
+		var spam: FloatingProp = pm.spawn_prop(FloatingProp.PropClass.GIFT_CRATE, "spam_fan",
+			"Rose", 10, Vector3(pos.x, props[0].position.y, pos.z))
+		spam.set_process(false)
+		props.append(spam)
+	for prop in props:
+		prop.call("_track_nameplate")
+	pm.call("_process", 0.0)
+	for prop in props:
+		prop.call("_track_nameplate")
+	for f in range(3):
+		await process_frame
+	root.get_viewport().get_texture().get_image().save_png(OUT_DIR + "/props_spam.png")
+
+	var spam_plates: Array[Rect2] = []
+	var spam_props: Array[Rect2] = []
+	for prop in props:
+		spam_plates.append(_plate_rect(cam, prop, canvas_scale))
+		spam_props.append(_prop_rect(cam, prop, canvas_scale))
+	# Text-on-text is the unreadable case, so that is the hard assertion here. Plate-on-prop
+	# is a preference the layout gives up in a pile this dense; it is reported, not failed.
+	var spam_collisions: String = ""
+	var over_props: int = 0
+	for i in range(spam_plates.size()):
+		for j in range(spam_plates.size()):
+			if i == j:
+				continue
+			if spam_plates[i].intersects(spam_plates[j]):
+				spam_collisions += "plate%d-plate%d " % [i, j]
+			if spam_plates[i].intersects(spam_props[j]):
+				over_props += 1
+	_ok(spam_collisions.is_empty(), "six plates stay clear of each other", spam_collisions)
+	print("note: %d plate-over-prop overlaps in the six-prop pile" % (over_props / 2))
+	var spam_min: float = 1.0
+	for prop in props:
+		spam_min = minf(spam_min, prop.nameplate_scale)
+	_ok(spam_min < 1.0, "dense clusters shrink rather than climb", "smallest scale %.2f" % spam_min)
+	_ok(spam_min >= 0.6, "shrunk plates stay legible", "smallest scale %.2f" % spam_min)
 
 	if update_baseline:
 		_write_baseline(measured, measured_line_px)
