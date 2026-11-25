@@ -44,6 +44,9 @@ const AREA_TOLERANCE_PCT: float = 5.0
 
 var checks: int = 0
 var failures: int = 0
+## Pixel comparisons that were reported but not counted because the run is on a different
+## renderer/GPU/driver/MSAA/engine than the baseline recorded.
+var softs: int = 0
 
 func _initialize() -> void:
 	_run()
@@ -53,6 +56,53 @@ func _ok(condition: bool, label: String, detail: String = "") -> void:
 	if not condition:
 		failures += 1
 	print(("PASS " if condition else "FAIL ") + label + ("" if detail.is_empty() else "  " + detail))
+
+## Reported, never failed: the numbers are only comparable on the machine that recorded them.
+func _soft(condition: bool, label: String, detail: String = "") -> void:
+	softs += 1
+	print(("SOFT-PASS " if condition else "SOFT-DIFF ") + label
+		+ ("" if detail.is_empty() else "  " + detail))
+
+func _check(strict: bool, condition: bool, label: String, detail: String = "") -> void:
+	if strict:
+		_ok(condition, label, detail)
+	else:
+		_soft(condition, label, detail)
+
+## Rendered pixels are a property of the machine as well as of the props: another GPU, driver,
+## MSAA level or engine build moves edges by more than the size tolerance without anything
+## about a prop changing. Record what produced the baseline and only assert against it where
+## that environment still holds.
+func _environment() -> Dictionary:
+	return {
+		"engine": str(Engine.get_version_info().get("string", "unknown")),
+		"renderer": "%s/%s" % [RenderingServer.get_current_rendering_method(),
+			RenderingServer.get_current_rendering_driver_name()],
+		"gpu": RenderingServer.get_video_adapter_name(),
+		"gpu_vendor": RenderingServer.get_video_adapter_vendor(),
+		"msaa": int(root.msaa_3d),
+	}
+
+func _describe_environment(env: Dictionary) -> String:
+	if env.is_empty():
+		return "not recorded"
+	return "%s, %s, %s (%s), MSAA %d" % [env.get("engine", "?"), env.get("renderer", "?"),
+		env.get("gpu", "?"), env.get("gpu_vendor", "?"), int(env.get("msaa", -1))]
+
+## Empty string when the run matches the baseline's machine.
+func _environment_mismatch(current: Dictionary, recorded: Dictionary) -> String:
+	if recorded.is_empty():
+		return "the baseline records no environment"
+	var diffs: Array = []
+	for key in ["engine", "renderer", "gpu", "gpu_vendor"]:
+		if str(recorded.get(key, "?")) != str(current.get(key, "?")):
+			diffs.append("%s: baseline %s, this run %s" % [key, str(recorded.get(key, "?")),
+				str(current.get(key, "?"))])
+	# JSON has no integers, so the recorded MSAA level reads back as a float; compare numbers.
+	if int(recorded.get("msaa", -1)) != int(current.get("msaa", -2)):
+		diffs.append("msaa: baseline %d, this run %d" % [int(recorded.get("msaa", -1)),
+			int(current.get("msaa", -2))])
+	return ", ".join(diffs)
 
 ## The baseline is about geometry, and plates are wider than the props they label. The
 ## keyed test would also pick up a warm-coloured plate (Rose ffb 1.0/0.4/0.6 passes it), so
@@ -159,7 +209,7 @@ func _load_baseline() -> Dictionary:
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(BASELINE_PATH))
 	return parsed if parsed is Dictionary else {}
 
-func _compare_silhouette(label: String, sil: Dictionary, baseline: Dictionary) -> void:
+func _compare_silhouette(label: String, sil: Dictionary, baseline: Dictionary, strict: bool) -> void:
 	var recorded: Dictionary = baseline.get("props", {})
 	var entry: Dictionary = recorded.get(label, {})
 	if entry.is_empty():
@@ -167,21 +217,21 @@ func _compare_silhouette(label: String, sil: Dictionary, baseline: Dictionary) -
 		return
 	var base_w: int = int(entry.get("w", 0))
 	var base_h: int = int(entry.get("h", 0))
-	_ok(absi(int(sil["w"]) - base_w) <= SIZE_TOLERANCE_PX
+	_check(strict, absi(int(sil["w"]) - base_w) <= SIZE_TOLERANCE_PX
 			and absi(int(sil["h"]) - base_h) <= SIZE_TOLERANCE_PX,
 		label + " size matches the baseline",
 		"%dx%d vs baseline %dx%d" % [sil["w"], sil["h"], base_w, base_h])
 	var base_area: float = maxf(float(entry.get("area", 1)), 1.0)
 	var delta_pct: float = absf(float(sil["area"]) - base_area) / base_area * 100.0
-	_ok(delta_pct <= AREA_TOLERANCE_PCT, label + " silhouette area",
+	_check(strict, delta_pct <= AREA_TOLERANCE_PCT, label + " silhouette area",
 		"%d px2 vs baseline %d (%.1f%%)" % [sil["area"], int(base_area), delta_pct])
 
-func _compare_line_height(line_px: int, baseline: Dictionary) -> void:
+func _compare_line_height(line_px: int, baseline: Dictionary, strict: bool) -> void:
 	var base_line: int = int(baseline.get("nameplate_line_px", 0))
 	if base_line <= 0:
 		_ok(false, "baseline has a nameplate line height", "run once with -- --update-baseline")
 		return
-	_ok(absi(line_px - base_line) <= SIZE_TOLERANCE_PX,
+	_check(strict, absi(line_px - base_line) <= SIZE_TOLERANCE_PX,
 		"nameplate line height matches the baseline", "%d px vs baseline %d" % [line_px, base_line])
 
 func _write_baseline(measured: Dictionary, line_px: int) -> void:
@@ -189,6 +239,7 @@ func _write_baseline(measured: Dictionary, line_px: int) -> void:
 		"view": "1280x720, default camera, 16:9",
 		"tolerance": {"size_px": SIZE_TOLERANCE_PX, "area_percent": AREA_TOLERANCE_PCT},
 		"nameplate_line_px": line_px,
+		"environment": _environment(),
 		"props": measured,
 	}
 	var file: FileAccess = FileAccess.open(BASELINE_PATH, FileAccess.WRITE)
@@ -296,7 +347,25 @@ func _run() -> void:
 	key_mat.albedo_color = KEY
 
 	var lines: PackedStringArray = PackedStringArray()
-	print("--- silhouette at %dx%d, %d settle ticks ---" % [VIEW.x, VIEW.y, SETTLE_TICKS])
+	var env: Dictionary = _environment()
+	var env_diff: String = _environment_mismatch(env, baseline.get("environment", {}))
+	# Strict only where the pixels are comparable. Everything geometric below (in frame, plate
+	# layout, legibility, tier colour) stays strict everywhere, because it does not depend on
+	# the renderer.
+	var strict: bool = update_baseline or env_diff.is_empty()
+	if update_baseline:
+		print("--- silhouette at %dx%d, %d settle ticks, recording baseline for %s ---"
+			% [VIEW.x, VIEW.y, SETTLE_TICKS, _describe_environment(env)])
+	elif strict:
+		print("--- silhouette at %dx%d, %d settle ticks (%s) ---"
+			% [VIEW.x, VIEW.y, SETTLE_TICKS, _describe_environment(env)])
+	else:
+		print("--- SOFT COMPARISON: this run is not the machine that recorded the baseline ---")
+		print("    baseline: %s" % _describe_environment(baseline.get("environment", {})))
+		print("    this run: %s" % _describe_environment(env))
+		print("    differs:  %s" % env_diff)
+		print("    pixel numbers are reported as SOFT-PASS/SOFT-DIFF and do not fail this run;")
+		print("    re-record on this machine only if its silhouettes are the ones you ship.")
 	# Off for the whole keyed section: the surface would clip each prop at a waterline that is
 	# not reproducible run to run (see the header). Restored before the clean captures below.
 	water.visible = false
@@ -326,7 +395,7 @@ func _run() -> void:
 		if update_baseline:
 			measured[spec[1]] = {"w": sil["w"], "h": sil["h"], "area": sil["area"]}
 		else:
-			_compare_silhouette(spec[1], sil, baseline)
+			_compare_silhouette(spec[1], sil, baseline, strict)
 
 		var line_m: float = float(prop.nameplate_label.font_size) * prop.nameplate_label.pixel_size
 		var a: Vector2 = cam.unproject_position(prop.nameplate_label.position)
@@ -513,11 +582,13 @@ func _run() -> void:
 	if update_baseline:
 		_write_baseline(measured, measured_line_px)
 	else:
-		_compare_line_height(measured_line_px, baseline)
+		_compare_line_height(measured_line_px, baseline, strict)
 
 	var file: FileAccess = FileAccess.open(OUT_PATH, FileAccess.WRITE)
 	file.store_string("\n".join(lines) + "\n")
 	file.close()
 
+	if softs > 0:
+		print("--- %d soft comparisons, none counted as failures (renderer environment differs from the baseline) ---" % softs)
 	print("--- %d checks, %d failures ---" % [checks, failures])
 	quit(1 if failures > 0 else 0)

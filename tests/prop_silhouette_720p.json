@@ -1,4 +1,11 @@
 {
+	"environment": {
+		"engine": "4.7.2-stable (steam)",
+		"gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+		"gpu_vendor": "NVIDIA",
+		"msaa": 2,
+		"renderer": "forward_plus/vulkan"
+	},
 	"nameplate_line_px": 26,
 	"props": {
 		"Gift Crate": {
