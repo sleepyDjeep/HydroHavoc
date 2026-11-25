@@ -138,11 +138,26 @@ if [ "$windowed" -eq 0 ]; then
 	echo "     Run it where a window can open: \"\$GODOT\" --path \"$ROOT\" --script res://tests/measure_props.gd"
 else
 	echo "rendering four props at 1280x720; this takes a minute."
-	if ! "$GODOT" --path "$ROOT" --script "res://tests/measure_props.gd"; then
-		echo "FAIL: rendered prop silhouettes moved away from the baseline (see .verify/*.png)." >&2
-		echo "      If no window could actually open here, rerun with MEASURE_PROPS=0." >&2
-		exit 1
+	log="$(mktemp)"
+	# The verdict is the harness's own summary, not only the exit status. Godot on Windows
+	# occasionally dies in its window teardown with signal 11 *after* the last check has
+	# printed: the crash frames are user32/opengl32/uxtheme window destruction and nothing of
+	# the run is left to execute. Only a summary that parses to zero failures forgives a
+	# nonzero exit, so a crash before the summary or any change to the wording fails the gate.
+	"$GODOT" --path "$ROOT" --script "res://tests/measure_props.gd" 2>&1 | tee "$log"
+	status="${PIPESTATUS[0]}"
+	failures="$(awk '/--- [0-9]+ checks, [0-9]+ failures ---/ { f = $(NF - 2) } END { print f }' "$log")"
+	if [ "$status" -ne 0 ]; then
+		if [ "$failures" = "0" ]; then
+			echo "note: Godot exited $status after a clean verdict; treating it as a teardown crash."
+		else
+			echo "FAIL: rendered prop silhouettes moved away from the baseline (see .verify/*.png)." >&2
+			echo "      If no window could actually open here, rerun with MEASURE_PROPS=0." >&2
+			rm -f "$log"
+			exit 1
+		fi
 	fi
+	rm -f "$log"
 	echo "OK: rendered prop silhouettes match the baseline."
 fi
 
