@@ -66,7 +66,7 @@ godot --path .
 
 ### Checking the scripts
 
-`tools/check.sh` imports the project, parses every script with a real Godot binary, then runs the tests: `tests/sim_invariants.gd` (a seeded, scripted run that asserts water mass conservation, no non-finite field values, no leaked or orphaned props, and that the fixed-step sim's catch-up cap holds under a frame spike), `tests/name_policy_test.gd`, and `tests/prop_size.gd`. A syntax error or a physics regression fails loudly instead of surfacing at runtime:
+`tools/check.sh` imports the project, parses every script with a real Godot binary, then runs the tests: `tests/sim_invariants.gd` (a seeded, scripted run that asserts water mass conservation, no non-finite field values, no leaked or orphaned props, and that the fixed-step sim's catch-up cap holds under a frame spike), `tests/name_policy_test.gd`, `tests/prop_size.gd` and `tests/float_height.gd`. A syntax error or a physics regression fails loudly instead of surfacing at runtime:
 
 ```bash
 GODOT=/path/to/godot ./tools/check.sh
@@ -99,6 +99,7 @@ Last checked on 2026-11-24 with Godot 4.7.2:
 
 - `--headless --import` completed and all 12 scripts passed `--check-only`.
 - Prop sizes are part of the gate: `tests/prop_size.gd` runs headless and compares each class's target height, fitted scale, seating and 720p projected extent against `tests/prop_size_baseline.json`, so a sizing change fails CI without a window.
+- Float height is part of the gate too: `tests/float_height.gd` pins each class's submerge fraction, y offset and the resulting draft (`SUBMERGE_FRACTION * height - offset`: duck 0.33 m, crate 0.088 m, anchor 0.21 m, mascot 0.21 m), then settles each prop into a real 2 m basin of a real `FluidSim` through its own `_process` and checks the geometry lands there — including the anchor's bed clearance, which is the rule that actually runs in deep water.
 - Rendered silhouettes are pinned separately in `tests/prop_silhouette_720p.json` (duck 59x55, crate 41x57, anchor 74x85, mascot 78x95 px, nameplate line 26 px; the keyed captures hide the water, so each silhouette is the prop's own pixels rather than what the waterline happens to leave showing). `tests/measure_props.gd` reproduces them to the pixel — it seeds the world, waits for the frame to stop changing, and four consecutive runs measured 0.0% drift — and it is the gate's last step wherever a display exists; headless runs skip it with a message instead of failing.
 - A scripted windowed boot of `scenes/main.tscn` ran 37 assertions with 0 failures: all four prop classes spawned with distinct geometry, the top-bar meters were measured clear of the score box, abilities `1`/`2`/`3` bound to the expected keycodes and applied their cooldowns, and no non-ASCII text was left in runtime strings.
 

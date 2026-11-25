@@ -1,0 +1,31 @@
+{
+	"basin_depth": 2.0,
+	"note": "surface-relative float height, headless; see tests/float_height.gd",
+	"props": {
+		"Gift Crate": {
+			"draft": 0.0875,
+			"offset": 0.25,
+			"submerge": 0.25
+		},
+		"Heavy Anchor": {
+			"bed_clearance": 0.25,
+			"draft": 0.212,
+			"offset": 0.1,
+			"submerge": 0.12
+		},
+		"Rubber Duck": {
+			"draft": 0.33,
+			"offset": 0.18,
+			"submerge": 0.3
+		},
+		"Streamer Mascot": {
+			"draft": 0.21,
+			"offset": 0.45,
+			"submerge": 0.3
+		}
+	},
+	"tolerance": {
+		"m": 0.005,
+		"settled_m": 0.02
+	}
+}

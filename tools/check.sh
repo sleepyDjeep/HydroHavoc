@@ -96,6 +96,16 @@ fi
 
 echo "OK: prop sizes match the baseline."
 
+echo "== float heights =="
+# The silhouette step hides the water to get reproducible pixels, so this is the only place
+# that knows where a prop sits in it.
+if ! "$GODOT" --headless --path "$ROOT" --script "res://tests/float_height.gd"; then
+	echo "FAIL: props no longer float where they used to." >&2
+	exit 1
+fi
+
+echo "OK: float heights match the baseline."
+
 echo "== prop silhouettes =="
 # The rendered check needs a real framebuffer, so it runs only where a display exists: CI
 # stays green and headless, while a developer machine measures the actual pixels instead of
