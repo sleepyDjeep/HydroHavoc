@@ -149,7 +149,17 @@ else
 	failures="$(awk '/--- [0-9]+ checks, [0-9]+ failures ---/ { f = $(NF - 2) } END { print f }' "$log")"
 	if [ "$status" -ne 0 ]; then
 		if [ "$failures" = "0" ]; then
+			# Keep the transcript so the crash can be reported upstream and a fix tested later:
+			# it holds the harness output and the engine's dump in order. .verify is gitignored,
+			# so this is local evidence, not a tracked file.
+			stamp="$(date +%Y%m%d-%H%M%S)"
+			dump="$ROOT/.verify/teardown_crash_$stamp.log"
+			mkdir -p "$ROOT/.verify"
+			cp "$log" "$dump"
+			printf 'gate: Godot exited %s after a clean verdict
+' "$status" >> "$dump"
 			echo "note: Godot exited $status after a clean verdict; treating it as a teardown crash."
+			echo "      kept the transcript at $dump"
 		else
 			echo "FAIL: rendered prop silhouettes moved away from the baseline (see .verify/*.png)." >&2
 			echo "      If no window could actually open here, rerun with MEASURE_PROPS=0." >&2
