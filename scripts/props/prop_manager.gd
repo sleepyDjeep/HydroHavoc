@@ -6,6 +6,8 @@ extends Node3D
 
 signal prop_vaporized_in_steam(prop_name: String, donor: String, bonus_pts: int)
 signal prop_plunged(prop_name: String, donor: String)
+## Emitted instead of spawning when the live-prop budget is already spent.
+signal prop_spawn_blocked(prop_name: String, used: float)
 
 ## A sixteen-character plate is roughly 120 px wide at 720p while the prop it labels is
 ## about 60 px, so props that drift close put their text on top of each other and over the
@@ -18,6 +20,22 @@ const PLATE_GAP_PX: float = 10.0
 ## Shrink steps, largest first. The smallest keeps the line at ~16 px at 720p, above the
 ## 11 px the legibility check asserts and above the old 0.12 m text that read badly.
 const PLATE_SCALES: Array[float] = [1.0, 0.85, 0.72, 0.6]
+
+## Live-prop budget, in mascot-equivalents, because a mascot is by far the most expensive
+## thing a donor can drop: the 2026 gameplay benchmark (fixed 60 fps, this machine) measured
+## 32 mascots at 10.96 ms median / 13.27 ms p95 against a 6.14 ms empty frame, and 32 crates
+## at 8.81 ms. Nothing else brakes gift spam - props leave only by boiling or plunging - so
+## this is a hard ceiling: past it spawn_prop() refuses the prop and the game says so.
+## 36 units is the top of the safe band (~36 mascots, or a mixed pile of about 64), not the
+## point where frames start missing.
+const PROP_BUDGET: float = 36.0
+## Cost of each class in those units, scaled from the measured per-prop frame cost.
+const PROP_WEIGHTS: Dictionary = {
+	FloatingProp.PropClass.STREAMER_MASCOT: 1.0,
+	FloatingProp.PropClass.HEAVY_ANCHOR: 0.6,
+	FloatingProp.PropClass.GIFT_CRATE: 0.5,
+	FloatingProp.PropClass.RUBBER_DUCK: 0.4,
+}
 
 var fluid_sim: FluidSim
 var active_props: Array[FloatingProp] = []
@@ -148,7 +166,26 @@ func _stagger_nameplates() -> void:
 		# Convert the chosen lift back to world units for the 3D label.
 		prop.nameplate_lift = maxf(0.0, (centre.y - full.y * chosen_scale * 0.5) - chosen.position.y) / px_per_m
 
+func prop_weight(prop_class: FloatingProp.PropClass) -> float:
+	return float(PROP_WEIGHTS.get(prop_class, 1.0))
+
+## Weight of the props still in play. Plunged props are already falling out of the arena and
+## stop rendering, so they stop counting here too: the cap follows what is drawn.
+func used_budget() -> float:
+	var total: float = 0.0
+	for prop in active_props:
+		if is_instance_valid(prop) and not prop.has_plunged:
+			total += prop_weight(prop.prop_class)
+	return total
+
 func spawn_prop(prop_class: FloatingProp.PropClass, donor: String, tier: String, val: int, spawn_pos: Vector3) -> FloatingProp:
+	# Before anything is built, so a refused spawn leaves no splash, no vfx and no tracking.
+	var weight: float = prop_weight(prop_class)
+	var used: float = used_budget()
+	if used + weight > PROP_BUDGET + 0.0001:
+		emit_signal("prop_spawn_blocked", _get_prop_display_name(prop_class), used)
+		return null
+
 	var prop: FloatingProp = FloatingProp.new()
 	prop.position = spawn_pos
 	# Configure before the node enters the tree: _ready() builds the visuals, so the

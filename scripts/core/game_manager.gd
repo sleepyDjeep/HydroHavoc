@@ -9,6 +9,9 @@ const TICK_RATE: float = 1.0 / 30.0 # 30Hz fluid sim step
 const MAX_SIM_STEPS_PER_FRAME: int = 4 # catch-up cap: one long frame must not spiral
 const WATER_CAPACITY: float = 1228.8 # 32x32 cells at 1.2 depth: the arena completely awash
 const ABILITY_COOLDOWNS: Array[float] = [10.0, 4.0, 12.0]
+## A refused gift arrives as a burst, one per spammed donation, so the limit toast is rate
+## limited: it would otherwise replace every other alert for as long as the spam lasts.
+const PROP_CAP_ALERT_INTERVAL: float = 2.0
 
 @onready var terrain_mesh_instance: MeshInstance3D = $Arena/TerrainMeshInstance
 @onready var water_mesh_instance: MeshInstance3D = $Arena/WaterMeshInstance
@@ -44,6 +47,8 @@ var freeze_timer: float = 0.0
 var ability_cooldowns: Array[float] = [0.0, 0.0, 0.0]
 var water_mesh_revision: int = -1
 var sim_steps_last_frame: int = 0
+var prop_cap_alert_timer: float = 0.0
+var props_refused: int = 0
 
 func _ready() -> void:
 	_init_simulation()
@@ -115,6 +120,7 @@ func _init_event_listeners() -> void:
 	hud.simulate_event_clicked.connect(_on_sim_event_clicked)
 	prop_manager.prop_vaporized_in_steam.connect(_on_prop_vaporized)
 	prop_manager.prop_plunged.connect(_on_prop_plunged)
+	prop_manager.prop_spawn_blocked.connect(_on_prop_spawn_blocked)
 
 func _process(delta: float) -> void:
 	_handle_input(delta)
@@ -122,6 +128,7 @@ func _process(delta: float) -> void:
 	_handle_combo_decay(delta)
 	_handle_freeze(delta)
 	_handle_ability_cooldowns(delta)
+	prop_cap_alert_timer = maxf(0.0, prop_cap_alert_timer - delta)
 
 	# Fluid simulation stepped at fixed tick rate, with a per-frame catch-up cap. Without
 	# it a single long frame (a stream hitch, a shader compile) asks for a dozen steps,
@@ -378,6 +385,20 @@ func _on_stream_action(donor: String, action: String, val: int, _platform: Strin
 func _on_prop_vaporized(prop_name: String, donor: String, bonus_pts: int) -> void:
 	hud.show_alert(prop_name.to_upper() + " BOILED!", donor + "'s gift vaporized! +" + str(bonus_pts) + " PTS!", Color(1.0, 0.8, 0.2))
 	add_shake(0.2)
+
+## Gift spam has no natural brake: donors can add props faster than the arena sheds them.
+## PropManager refuses spawns past its budget; this makes the refusal visible rather than a
+## gift that silently never appears.
+func _on_prop_spawn_blocked(prop_name: String, used: float) -> void:
+	props_refused += 1
+	if prop_cap_alert_timer > 0.0:
+		return
+	prop_cap_alert_timer = PROP_CAP_ALERT_INTERVAL
+	push_warning("Prop budget spent (%.1f/%.1f): %s refused, %d refused so far"
+		% [used, PropManager.PROP_BUDGET, prop_name, props_refused])
+	hud.show_alert("PROP LIMIT REACHED", "%s skipped - %d%% of the prop budget in use"
+		% [prop_name, int(round(used / PropManager.PROP_BUDGET * 100.0))],
+		Color(1.0, 0.55, 0.15))
 
 func _on_prop_plunged(prop_name: String, donor: String) -> void:
 	hud.show_alert("WATERFALL PLUNGE!", "RIP " + donor + "'s " + prop_name + " fell off the edge!", Color(0.9, 0.2, 0.3))
