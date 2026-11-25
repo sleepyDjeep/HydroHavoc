@@ -495,6 +495,15 @@ func _create_mascot_mesh() -> void:
 		inst.scale = Vector3(0.35, 0.35, 0.35)
 		add_child(inst)
 		visual_mesh = inst
+		# The GLB ships Idle along with four locomotion clips and nothing ever started one, so
+		# the streamer mascot stood as a statue. Loop it explicitly: the idle is what the model is
+		# for, and a one-shot would drop it back to the rest pose mid-stream.
+		var player: AnimationPlayer = inst.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		if player and player.has_animation("Idle"):
+			var idle: Animation = player.get_animation("Idle")
+			if idle and idle.loop_mode == Animation.LOOP_NONE:
+				idle.loop_mode = Animation.LOOP_LINEAR
+			player.play("Idle")
 	else:
 		# Procedural cute capsule mascot
 		visual_mesh = Node3D.new()

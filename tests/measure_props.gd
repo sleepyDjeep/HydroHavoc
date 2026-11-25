@@ -141,6 +141,27 @@ func _prop_rect(cam: Camera3D, prop: FloatingProp, canvas_scale: Vector2) -> Rec
 		hi = hi.max(p)
 	return Rect2(lo, hi - lo)
 
+## The mascot now plays its Idle clip, so its pose depends on how long the window has been open
+## by the time a frame is captured: the same underlying geometry measured anywhere from 1603 to
+## 1816 px2 at an identical 78x95 box before the pose was pinned. Seek each player to frame 0
+## and pause it, so the silhouette is a property of the model rather than of start-up time.
+func _pin_poses(node: Node) -> void:
+	for child in node.get_children():
+		if child is AnimationPlayer:
+			var player: AnimationPlayer = child
+			if not player.current_animation.is_empty():
+				player.play(player.current_animation) # restart so the seek lands on frame 0
+				player.seek(0.0, true)
+				player.pause()
+		else:
+			_pin_poses(child)
+
+func _players(node: Node, out: Array) -> void:
+	for child in node.get_children():
+		if child is AnimationPlayer:
+			out.append(child)
+		_players(child, out)
+
 func _meshes(node: Node, out: Array) -> void:
 	for child in node.get_children():
 		if child is MeshInstance3D and child.mesh:
@@ -327,6 +348,27 @@ func _run() -> void:
 		if child is MeshInstance3D:
 			child.queue_free()
 	await process_frame
+
+	# The mascot's Idle clip is the point of the model, so check it is actually running before
+	# pinning it: a prop whose animation never starts would sail through a "pose is pinned" test.
+	var mascot_players: Array = []
+	for prop in props:
+		if prop.prop_class == FloatingProp.PropClass.STREAMER_MASCOT:
+			_players(prop, mascot_players)
+	_ok(not mascot_players.is_empty(), "the mascot has an AnimationPlayer",
+		"%d player(s)" % mascot_players.size())
+	for player in mascot_players:
+		_ok(player.current_animation == "Idle", "the mascot is playing Idle", player.current_animation)
+
+	# Freeze every animated prop at the first frame of whatever it is playing (the mascot's Idle)
+	# before any silhouette is captured.
+	for prop in props:
+		_pin_poses(prop)
+	for player in mascot_players:
+		_ok(not player.is_playing() and player.current_animation_position == 0.0,
+			"the mascot's pose is pinned at frame 0",
+			"%s at %.3f s, playing %s" % [player.current_animation,
+				player.current_animation_position, player.is_playing()])
 
 	for i in range(props.size()):
 		var spec: Array = specs[i]
