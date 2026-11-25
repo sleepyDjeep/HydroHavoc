@@ -70,6 +70,16 @@ fi
 
 echo "OK: $total scripts parsed."
 
+echo "== boot =="
+# Input bindings, ability cooldowns, HUD layout and runtime strings: the parts of the game that
+# no geometry or fluid test can see.
+if ! "$GODOT" --headless --path "$ROOT" --script "res://tests/boot_test.gd"; then
+	echo "FAIL: the scene did not boot cleanly." >&2
+	exit 1
+fi
+
+echo "OK: boot test passes."
+
 echo "== sim invariants =="
 if ! "$GODOT" --headless --path "$ROOT" --script "res://tests/sim_invariants.gd"; then
 	echo "FAIL: simulation invariants broke." >&2

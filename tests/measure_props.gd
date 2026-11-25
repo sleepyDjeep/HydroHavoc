@@ -267,6 +267,12 @@ func _run() -> void:
 
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
+	# Stream events run on their own real-time timer, so how many of them fire before the settle
+	# ticks depends on how long the launch took. One landing in the first frame was enough to move
+	# the water level by a centimetre (2.21 vs 2.22 m) with the RNG already seeded, which shifts
+	# every prop and flipped the marginal huddle-plate assertion on roughly one run in four.
+	# Off before the first frame elapses, not after.
+	main.stream_events.set_process(false)
 	await process_frame
 	main.set_process(false) # the harness owns the clock
 
