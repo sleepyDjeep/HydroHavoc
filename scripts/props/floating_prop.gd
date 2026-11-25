@@ -53,6 +53,8 @@ const SUBMERGE_FRACTION: Dictionary = {
 	PropClass.STREAMER_MASCOT: 0.30,
 }
 
+const MASCOT_MERGE = preload("res://scripts/props/mascot_mesh_merge.gd")
+
 @export var prop_class: PropClass = PropClass.RUBBER_DUCK
 @export var donor_name: String = "Viewer"
 @export var gift_tier: String = "Rose"
@@ -504,6 +506,10 @@ func _create_mascot_mesh() -> void:
 			if idle and idle.loop_mode == Animation.LOOP_NONE:
 				idle.loop_mode = Animation.LOOP_LINEAR
 			player.play("Idle")
+		# Five surfaces across five mesh instances: merge to one surface per shading setup and
+		# share that mesh between every mascot (see MascotMeshMerge). Preloaded rather than
+		# using the global class name, which only exists once the project has been imported.
+		MASCOT_MERGE.apply(inst, mascot_path)
 	else:
 		# Procedural cute capsule mascot
 		visual_mesh = Node3D.new()

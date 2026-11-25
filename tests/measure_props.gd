@@ -30,9 +30,18 @@ const VIEW: Vector2i = Vector2i(1280, 720)
 const KEY: Color = Color(1.0, 0.0, 1.0)
 const SETTLE_TICKS: int = 120
 const DT: float = 1.0 / 30.0
+## Fixed pre-settle ticks before the harness owns the clock. See _run().
+const PRE_SETTLE_TICKS: int = 2
 const OUT_PATH: String = "user://prop_measure.txt"
 const OUT_DIR: String = "res://.verify"
 const BASELINE_PATH: String = "res://tests/prop_silhouette_720p.json"
+## A capture is only accepted after this many identical frames in a row.
+const SETTLE_FRAMES: int = 3
+## Upper bound on the wait for that stability; beyond it the capture fails rather than measuring.
+const SETTLE_MAX_FRAMES: int = 24
+## A prop's settled height is a world value, not a GPU one, so it is compared tightly: a
+## centimetre of water level moves every silhouette by a pixel.
+const HEIGHT_TOLERANCE_M: float = 0.005
 ## Measured edges move by about a pixel between runs (antialiasing), so the baseline is a
 ## band rather than an exact value.
 const SIZE_TOLERANCE_PX: int = 2
@@ -205,24 +214,36 @@ func _key_area(img: Image) -> Dictionary:
 
 ## The window can still be settling right after it opens: a readback then is a partially
 ## updated frame, which shows up as keyed pixels scattered away from the prop (the first launch
-## of a run measured 145x101 for a 59x53 duck, with the area barely changed). With the water
-## and the plates hidden the keyed frame is static, so requiring two identical frames in a row
-## waits that out and costs one frame.
+## of a run measured 145x101 for a 59x53 duck, with the area barely changed). With the water,
+## the plates and the animation pinned the keyed frame is static, so only an unsettled window
+## can differ between two frames.
+##
+## The rule is SETTLE_FRAMES identical frames in a row, not "two equal frames once": a pair can
+## match while a slower change (a pose still blending, a plate fading) has not landed yet, and a
+## readback at the wrong size would scale every sample onto the wrong pixel. Failing here means
+## no pixels are measured at all; the old version fell through and measured whatever frame it
+## happened to hold, which is how a 1 px drift can slip quietly into a baseline.
 func _settled_frame() -> Image:
 	var prev: PackedByteArray = PackedByteArray()
+	var streak: int = 0
 	var img: Image = null
-	for i in range(12):
+	for i in range(SETTLE_MAX_FRAMES):
 		await process_frame
 		img = root.get_viewport().get_texture().get_image()
-		if img.get_size() != VIEW:
+		if img == null or img.get_size() != VIEW:
 			prev = PackedByteArray()
+			streak = 0
 			continue
 		var data: PackedByteArray = img.get_data()
 		if not prev.is_empty() and data == prev:
-			return img
+			streak += 1
+			if streak >= SETTLE_FRAMES - 1:
+				return img
+		else:
+			streak = 0
 		prev = data
-	push_error("viewport frame never settled at %s" % str(VIEW))
-	return img
+	push_error("viewport frame never settled at %s in %d frames" % [str(VIEW), SETTLE_MAX_FRAMES])
+	return Image.new()
 
 func _load_baseline() -> Dictionary:
 	if not FileAccess.file_exists(BASELINE_PATH):
@@ -230,7 +251,8 @@ func _load_baseline() -> Dictionary:
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(BASELINE_PATH))
 	return parsed if parsed is Dictionary else {}
 
-func _compare_silhouette(label: String, sil: Dictionary, baseline: Dictionary, strict: bool) -> void:
+func _compare_silhouette(label: String, sil: Dictionary, height: float, baseline: Dictionary,
+		strict: bool) -> void:
 	var recorded: Dictionary = baseline.get("props", {})
 	var entry: Dictionary = recorded.get(label, {})
 	if entry.is_empty():
@@ -242,6 +264,14 @@ func _compare_silhouette(label: String, sil: Dictionary, baseline: Dictionary, s
 			and absi(int(sil["h"]) - base_h) <= SIZE_TOLERANCE_PX,
 		label + " size matches the baseline",
 		"%dx%d vs baseline %dx%d" % [sil["w"], sil["h"], base_w, base_h])
+	# The pixels can only repeat if the prop sits where it sat before. Checked hard, whatever
+	# the GPU: this is world state, and a centimetre of drift is what turned 73x95 into 74x96.
+	if not entry.has("y"):
+		_ok(false, label + " records its settled height", "run once with -- --update-baseline")
+	else:
+		var base_y: float = float(entry["y"])
+		_ok(absf(height - base_y) <= HEIGHT_TOLERANCE_M, label + " settled height matches the baseline",
+			"%.3f m vs baseline %.3f m" % [height, base_y])
 	var base_area: float = maxf(float(entry.get("area", 1)), 1.0)
 	var delta_pct: float = absf(float(sil["area"]) - base_area) / base_area * 100.0
 	_check(strict, delta_pct <= AREA_TOLERANCE_PCT, label + " silhouette area",
@@ -294,8 +324,17 @@ func _run() -> void:
 	# every prop and flipped the marginal huddle-plate assertion on roughly one run in four.
 	# Off before the first frame elapses, not after.
 	main.stream_events.set_process(false)
+	# Own the clock before the first frame elapses, from a fixed number of sim ticks. Left
+	# automatic, that frame ran between one and MAX_SIM_STEPS_PER_FRAME ticks depending on how
+	# long the launch took, so the water settled between 2.21 and 2.45 m and took every prop
+	# with it; the huddle assert, whose plates clear each other by a fraction of a pixel, then
+	# flipped on roughly every other run. Two ticks are the settled world the baseline was
+	# recorded in, so the reference numbers stay comparable and every run starts at the same
+	# level.
+	main.set_process(false)
+	for i in range(PRE_SETTLE_TICKS):
+		main.call("_process", DT)
 	await process_frame
-	main.set_process(false) # the harness owns the clock
 
 	var cam: Camera3D = main.get_node("CameraPivot/Camera3D")
 	var pm: PropManager = main.get_node("Arena/PropManager")
@@ -435,15 +474,20 @@ func _run() -> void:
 		_set_plates_visible(props, true)
 		for mi in meshes:
 			mi.material_override = originals[mi]
+		if frame.is_empty():
+			_ok(false, spec[1] + " captured a settled frame",
+				"no %d stable frames at %dx%d" % [SETTLE_FRAMES, VIEW.x, VIEW.y])
+			continue
 
 		var sil: Dictionary = _key_area(frame)
 		print("%-14s %2d x %2d px, %5d area, y=%.2f, screen=(%.0f,%.0f)" %
 			[spec[1], sil["w"], sil["h"], sil["area"], prop.position.y, center.x, center.y])
 		lines.append("%s w=%d h=%d area=%d" % [spec[1], sil["w"], sil["h"], sil["area"]])
 		if update_baseline:
-			measured[spec[1]] = {"w": sil["w"], "h": sil["h"], "area": sil["area"]}
+			measured[spec[1]] = {"w": sil["w"], "h": sil["h"], "area": sil["area"],
+				"y": snappedf(prop.position.y, 0.0001)}
 		else:
-			_compare_silhouette(spec[1], sil, baseline, strict)
+			_compare_silhouette(spec[1], sil, prop.position.y, baseline, strict)
 
 		var line_m: float = float(prop.nameplate_label.font_size) * prop.nameplate_label.pixel_size
 		var a: Vector2 = cam.unproject_position(prop.nameplate_label.position)

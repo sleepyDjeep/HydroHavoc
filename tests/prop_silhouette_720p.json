@@ -11,22 +11,26 @@
 		"Gift Crate": {
 			"area": 1945,
 			"h": 57,
-			"w": 41
+			"w": 41,
+			"y": 2.2223
 		},
 		"Heavy Anchor": {
 			"area": 2591,
 			"h": 85,
-			"w": 74
+			"w": 74,
+			"y": 1.25
 		},
 		"Rubber Duck": {
 			"area": 2493,
 			"h": 55,
-			"w": 59
+			"w": 59,
+			"y": 2.326
 		},
 		"Streamer Mascot": {
 			"area": 1551,
 			"h": 95,
-			"w": 73
+			"w": 73,
+			"y": 2.2068
 		}
 	},
 	"tolerance": {
